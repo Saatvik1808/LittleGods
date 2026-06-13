@@ -1781,14 +1781,9 @@ const SILHOUETTES = {
 // (e.g. "maya_crisis") or just "<who>" as a fallback for any of that person's moments.
 // Missing keys fall back gracefully to the procedural diorama — no errors.
 const ART_MANIFEST = {
-  "maya_crisis": "maya_crisis.jpg",
-  "theo_crisis": "theo_crisis.jpg",
-  "sol_crisis": "sol_crisis.jpg",
-  // until tense-specific art exists, reuse the crisis paintings for tense too
-  // (so every danger-band moment is painted). Replace when tense art is added.
-  "maya_tense": "maya_crisis.jpg",
-  "theo_tense": "theo_crisis.jpg",
-  "sol_tense": "sol_crisis.jpg",
+  "maya_calm": "maya_calm.jpg", "maya_tense": "maya_tense.jpg", "maya_crisis": "maya_crisis.jpg", "maya_recovering": "maya_recovering.jpg",
+  "theo_calm": "theo_calm.jpg", "theo_tense": "theo_tense.jpg", "theo_crisis": "theo_crisis.jpg", "theo_recovering": "theo_recovering.jpg",
+  "sol_calm": "sol_calm.jpg",  "sol_tense": "sol_tense.jpg",  "sol_crisis": "sol_crisis.jpg",  "sol_recovering": "sol_recovering.jpg",
 };
 function setDioramaArt(who, band, override) {
   const frame = document.getElementById('dioramaFrame');
