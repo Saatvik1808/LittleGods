@@ -237,6 +237,37 @@ html, body {
   text-align: center;
 }
 .thread-name .age { color: var(--ink-faint); font-size: 8px; display: block; margin-top: 2px; }
+.thread-status {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 5px;
+  opacity: .9;
+}
+.crisis-bar {
+  position: relative;
+  width: 4px;
+  height: 30px;
+  margin: 0 auto 6px;
+  background: rgba(255,255,255,.06);
+  border-radius: 2px;
+  overflow: visible;
+}
+.crisis-fill {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  border-radius: 2px;
+  transition: height .5s ease;
+}
+.susp-tick {
+  position: absolute;
+  left: -3px; right: -3px;
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 4px var(--cyan);
+}
 .thread-weave {
   flex: 1;
   position: relative;
@@ -1328,146 +1359,225 @@ const CITIZENS = {
 
 // ---------- DAILY CONTENT (authored beacon moments per citizen per day) ----------
 // Each moment: { id, who, time, lens, scene, overheard, mood, situation? (chat-able), mechanism? (coincidence-able), affectIfWatched }
-const DAILY_CONTENT = [
-  // ---- DAY 1 ----
-  {
-    moments: [
-      { id: "d1m1", who: "maya", time: "07:42", lens: "DOORBELL CAM · 5A",
-        scene: "Maya leaves without breakfast. Ines watches her from the kitchen and does not call out.",
-        overheard: "Ines, alone, to the coffee pot: \"she said fine again.\"",
-        mood: "amber", affect: "tender", situation: "marriage" },
-      { id: "d1m2", who: "theo", time: "11:18", lens: "PHARMACY CAM · LOBBY",
-        scene: "Theo signs for his mother's prescription. Counts cash three times. Recounts it.",
-        overheard: "pharmacist: \"insurance still won't cover the new one.\"",
-        mood: "amber", affect: "neutral",
-        mechanism: { id: "delay-elevator", label: "Elevator delay (Theo skips lunch shift, eats with mother)",
-                     desc: "Stall the freight elevator with a thermal flag. Theo returns to 3B for lunch — sees his mother awake for the first time this week.",
-                     cost: 12, evidence: 1, affect: { warmth: 1, alarm: -1, blame: -1, need: -1 }, kind: "protective" } },
-      { id: "d1m3", who: "sol", time: "16:30", lens: "ELEVATOR FISHEYE",
-        scene: "Sol rides up alone. Looks at the camera for a long time. Then waves, small.",
-        overheard: "Sol, almost inaudible: \"hi.\"",
-        mood: "amber", affect: "tender", situation: "contact" },
-    ]
-  },
-  // ---- DAY 2 ----
-  {
-    moments: [
-      { id: "d2m1", who: "theo", time: "02:14", lens: "PHONE INTERCEPT",
-        scene: "Theo and Marcus, two floors apart, are texting about money.",
-        overheard: "Marcus: \"you in for tonight? we're at the place.\"",
-        mood: "amber", affect: "neutral", situation: "debt" },
-      { id: "d2m2", who: "maya", time: "09:01", lens: "HALLWAY CAM · 5",
-        scene: "Maya pauses outside 5A. Adjusts her hair in the mirrored sconce. Goes back in.",
+// ============================================================
+// SIMULATION LAYER
+// Citizens hold persistent state. A crisis clock ticks toward
+// ruin; your acts bend it. Suspicion can blind you. Each day's
+// moments are SELECTED by current state — so every run diverges
+// and your choices visibly compound.
+// ============================================================
+
+const SIM_INIT = {
+  maya: { crisis: 54, mood: 46, suspicion: 0, crisisName: 'her marriage' },
+  theo: { crisis: 62, mood: 40, suspicion: 0, crisisName: 'his debt' },
+  sol:  { crisis: 50, mood: 38, suspicion: 0, crisisName: 'his isolation' },
+};
+
+const BAND_LABEL = { calm: 'settled', tense: 'strained', crisis: 'breaking', recovering: 'mending', analog: 'gone dark' };
+const BAND_COLOR = { calm: '#d4a04a', tense: '#d98a3a', crisis: '#b85850', recovering: '#9ac26a', analog: '#5a5a66' };
+
+function citizenState(key) {
+  if (!STATE.citizens) STATE.citizens = {};
+  if (!STATE.citizens[key]) STATE.citizens[key] = Object.assign({ analog: false, _improved: false, _lastCrisis: SIM_INIT[key].crisis }, SIM_INIT[key]);
+  return STATE.citizens[key];
+}
+function initCitizenStates() {
+  STATE.citizens = {};
+  ['maya', 'theo', 'sol'].forEach(k => citizenState(k));
+}
+function bandFor(key) {
+  const c = citizenState(key);
+  if (c.analog) return 'analog';
+  if (c.crisis >= 70) return 'crisis';
+  if (c.crisis >= 42) return 'tense';
+  if (c._improved && c.crisis < 50) return 'recovering';
+  return 'calm';
+}
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Apply an intervention's effect to a citizen's state.
+function applyEffects(key, eff) {
+  const c = citizenState(key);
+  const before = c.crisis;
+  if (eff.crisis) c.crisis = clamp(c.crisis + eff.crisis, 0, 100);
+  if (eff.mood)   c.mood   = clamp(c.mood + eff.mood, 0, 100);
+  if (eff.suspicion) c.suspicion = clamp(c.suspicion + eff.suspicion, 0, 100);
+  c._improved = (c.crisis < before - 4);
+  if (c.suspicion >= 80 && !c.analog) { c.analog = true; STATE.frays.push(key); }
+}
+
+// Nightly tick: untended crises drift worse, suspicion cools, bands recompute.
+function runTick() {
+  ['maya', 'theo', 'sol'].forEach(key => {
+    const c = citizenState(key);
+    const touchedToday = STATE._touchedToday && STATE._touchedToday[key];
+    // natural drift: low mood worsens faster; if you didn't act, the crisis creeps up
+    if (!touchedToday) {
+      const drift = 4 + Math.round((60 - c.mood) / 12);
+      c.crisis = clamp(c.crisis + Math.max(2, drift), 0, 100);
+      c.mood = clamp(c.mood - 2, 0, 100);
+    }
+    // suspicion cools when you leave them alone
+    if (!touchedToday) c.suspicion = clamp(c.suspicion - 10, 0, 100);
+    // a citizen can come back from analog if suspicion cools enough
+    if (c.analog && c.suspicion < 55) { c.analog = false; STATE.frays = STATE.frays.filter(f => f !== key); }
+    c._lastCrisis = c.crisis;
+  });
+  STATE._touchedToday = {};
+}
+
+// ---- BANDED CONTENT: pools selected by each citizen's current band ----
+// mood color script: amber (warm) / cyan (cold/forensic) / violet (climactic)
+const SIM_MOMENTS = {
+  maya: {
+    calm: [
+      { time: "08:22", lens: "KITCHEN CAM · 5A", mood: "amber", affect: "tender",
+        scene: "Maya and Ines share coffee. Their hands almost touch on the counter, and neither moves away.",
+        overheard: "Ines: \"stay five more minutes.\"" },
+      { time: "19:40", lens: "DOORBELL CAM · 5A", mood: "amber", affect: "warm",
+        scene: "Maya comes home humming. She actually knocks her own silly knock before unlocking.",
+        overheard: "—" },
+    ],
+    tense: [
+      { time: "07:42", lens: "DOORBELL CAM · 5A", mood: "amber", affect: "tender", situation: "marriage",
+        scene: "Maya leaves without breakfast. Ines watches from the kitchen and does not call out.",
+        overheard: "Ines, alone, to the coffee pot: \"she said fine again.\"" },
+      { time: "21:10", lens: "HALLWAY CAM · 5", mood: "cyan", affect: "burned", situation: "marriage",
+        scene: "Maya stands outside her own door, typing and deleting the same message to Ines.",
         overheard: "—",
-        mood: "amber", affect: "tender",
-        mechanism: { id: "lost-keys", label: "Keys 'fall' (Ines finds them, opens the door, meets Maya in the threshold)",
-                     desc: "Magnetically drop Maya's keys behind the doormat. Ines opens the door to bring out the recycling and finds her, frozen in the hall.",
-                     cost: 10, evidence: 1, affect: { warmth: 2, distance: -2, need: 1 }, kind: "protective" } },
-      { id: "d2m3", who: "sol", time: "21:50", lens: "ROOFTOP CAM",
-        scene: "Sol on the roof, alone. Looks down. Steps back. Sits with their knees up.",
-        overheard: "Sol, to nobody: \"i'm not gonna. don't worry.\"",
-        mood: "amber", affect: "tender" },
-    ]
-  },
-  // ---- DAY 3 ----
-  {
-    moments: [
-      { id: "d3m1", who: "maya", time: "18:11", lens: "DOORBELL CAM · 5A",
-        scene: "Maya stands in the doorway with a bag. Ines is in the kitchen, back turned.",
-        overheard: "Maya, half-volume: \"i don't know how to come in.\"",
-        mood: "cyan", affect: "burned",
         mechanism: { id: "song-shuffle", label: "Their wedding song surfaces on Ines's shuffle",
-                     desc: "Promote one track in Ines's algorithm. The song starts as Maya opens the door.",
-                     cost: 14, evidence: 2, affect: { warmth: 3, distance: -3 }, kind: "growth" } },
-      { id: "d3m2", who: "theo", time: "23:40", lens: "PHONE INTERCEPT",
-        scene: "Theo, half-drunk, texting his mother that he loves her. She is asleep.",
-        overheard: "Theo: \"i'll fix it. tomorrow.\"",
-        mood: "cyan", affect: "burned" },
-      { id: "d3m3", who: "sol", time: "07:15", lens: "ELEVATOR FISHEYE",
-        scene: "Sol holds a piece of paper up to the camera. They have written something on it.",
-        overheard: "(handwritten, in marker: I know you're listening. Blink twice if you're real.)",
-        mood: "violet", affect: "tender" },
-    ]
+          desc: "Promote one track in Ines's algorithm. It starts as Maya opens the door.",
+          cost: 14, evidence: 2, kind: "growth", effects: { crisis: -22, mood: 12 } } },
+    ],
+    crisis: [
+      { time: "18:11", lens: "DOORBELL CAM · 5A", mood: "violet", affect: "burned", situation: "marriage",
+        scene: "Maya is in the doorway with a packed bag. Ines is in the kitchen, back turned.",
+        overheard: "Maya, half-volume: \"i don't know how to come in.\"",
+        mechanism: { id: "lost-keys", label: "Her keys 'fall' — Ines opens the door and finds her",
+          desc: "Drop Maya's keys behind the mat. Ines comes out for the recycling and meets her in the hall.",
+          cost: 12, evidence: 1, kind: "protective", effects: { crisis: -18, mood: 8 } } },
+      { time: "23:55", lens: "PHONE INTERCEPT", mood: "violet", affect: "burned", situation: "marriage",
+        scene: "Maya is drafting a message to a divorce lawyer she found at 2am.",
+        overheard: "draft: \"i think i'm finally...\"" },
+    ],
+    recovering: [
+      { time: "06:30", lens: "KITCHEN CAM · 5A", mood: "amber", affect: "tender",
+        scene: "Maya makes coffee for two without being asked. Ines pours her one back.",
+        overheard: "Maya: \"thank you.\"" },
+    ],
+    analog: [
+      { time: "—:—", lens: "INFERRED · NEIGHBORS", mood: "cyan", affect: "burned",
+        scene: "You cannot see into 5A anymore — the camera is taped. Through the wall, only the shape of a long silence.",
+        overheard: "(the super, to himself: \"those two been quiet. too quiet.\")" },
+    ],
   },
-  // ---- DAY 4 ----
-  {
-    moments: [
-      { id: "d4m1", who: "theo", time: "03:30", lens: "PHONE INTERCEPT",
-        scene: "Theo at 'the place', alone. Texting Marcus.",
+  theo: {
+    calm: [
+      { time: "11:18", lens: "PHARMACY CAM · LOBBY", mood: "amber", affect: "neutral",
+        scene: "Theo signs for his mother's prescription, counts the cash, and for once it's enough.",
+        overheard: "pharmacist: \"tell your mom I said hi.\"" },
+    ],
+    tense: [
+      { time: "02:14", lens: "PHONE INTERCEPT", mood: "amber", affect: "neutral", situation: "debt",
+        scene: "Theo and Marcus, two floors apart, are texting about money again.",
+        overheard: "Marcus: \"you in for tonight? we're at the place.\"" },
+      { time: "11:18", lens: "PHARMACY CAM", mood: "cyan", affect: "burned",
+        scene: "Theo recounts the cash three times. It is short. He puts the new prescription back.",
+        overheard: "pharmacist: \"insurance still won't cover it.\"",
+        mechanism: { id: "delayed-bill", label: "A hospital bill 'gets lost' for another month",
+          desc: "Flag the bill envelope undeliverable at the sorting facility. One more month of breath.",
+          cost: 18, evidence: 3, kind: "protective", effects: { crisis: -24, mood: 6 } } },
+    ],
+    crisis: [
+      { time: "03:30", lens: "PHONE INTERCEPT", mood: "violet", affect: "burned", situation: "debt",
+        scene: "Theo is at 'the place', alone, about to text Marcus that he's all the way in.",
         overheard: "Theo: \"yeah. one double. then i'm out.\"",
-        mood: "cyan", affect: "burned", situation: "debt" },
-      { id: "d4m2", who: "maya", time: "08:22", lens: "KITCHEN CAM · 5A",
-        scene: "Maya and Ines eat breakfast together. Neither one says anything for eleven minutes.",
-        overheard: "Ines, finally: \"are you happy.\"",
-        mood: "cyan", affect: "neutral",
-        situation: "marriage" },
-      { id: "d4m3", who: "sol", time: "14:00", lens: "SCHOOL CAM (RELAYED)",
-        scene: "Sol sits alone at lunch. Tray untouched. Phone face-down.",
-        overheard: "—",
-        mood: "cyan", affect: "tender",
-        mechanism: { id: "lost-jacket", label: "A coincidence brings them home early (their jacket 'goes missing')",
-                     desc: "Mark Sol's jacket as 'found' in the lost-and-found system. They get an SMS, walk home in the rain. Anton is at the door with a towel.",
-                     cost: 10, evidence: 1, affect: { warmth: 2, need: -1 }, kind: "protective" } },
-    ]
-  },
-  // ---- DAY 5 ----
-  {
-    moments: [
-      { id: "d5m1", who: "sol", time: "23:11", lens: "ELEVATOR FISHEYE",
-        scene: "Sol holds up a new note: 'thank you. i'm still scared. but thanks.'",
-        overheard: "—",
-        mood: "violet", affect: "tender" },
-      { id: "d5m2", who: "maya", time: "19:05", lens: "DOORBELL CAM · 5A",
-        scene: "Maya texts someone before knocking on her own door.",
-        overheard: "—",
-        mood: "violet", affect: "burned", situation: "marriage" },
-      { id: "d5m3", who: "theo", time: "06:00", lens: "PHARMACY CAM",
-        scene: "Theo waits for the pharmacy to open. He has shaved. He has cried.",
-        overheard: "Theo: \"i need to talk to the social worker. about my mom.\"",
-        mood: "amber", affect: "tender",
-        mechanism: { id: "delayed-bill", label: "A hospital bill 'gets lost' in the post for another month",
-                     desc: "Flag the bill envelope as 'undeliverable' at the sorting facility. Theo gets one more month of breath.",
-                     cost: 18, evidence: 3, affect: { warmth: 0, alarm: -2, need: -1 }, kind: "protective" } },
-    ]
-  },
-  // ---- DAY 6 ----
-  {
-    moments: [
-      { id: "d6m1", who: "maya", time: "20:14", lens: "KITCHEN CAM · 5A",
-        scene: "Maya and Ines on the couch, not touching. The wedding song plays again — without your help, this time.",
-        overheard: "Ines: \"i remember this.\"",
-        mood: "violet", affect: "tender" },
-      { id: "d6m2", who: "theo", time: "02:00", lens: "PHONE INTERCEPT",
-        scene: "Marcus is texting Theo. Theo has not answered for nine hours.",
-        overheard: "Marcus: \"hello? are you ghosting me bro?\"",
-        mood: "violet", affect: "burned",
         mechanism: { id: "wrong-number", label: "Marcus's next text 'fails to deliver'",
-                     desc: "Drop the message at the carrier level. Marcus assumes Theo blocked him. The relationship breaks.",
-                     cost: 20, evidence: 3, affect: { distance: 3, finality: 2 }, kind: "control" } },
-      { id: "d6m3", who: "sol", time: "12:00", lens: "ELEVATOR FISHEYE",
-        scene: "Sol rides up with a stranger. They do not look at the camera once. Their hand is in their pocket, holding something.",
-        overheard: "—",
-        mood: "violet", affect: "burned", situation: "contact" },
-    ]
+          desc: "Drop the message at the carrier level. Marcus assumes Theo blocked him. The friendship breaks — but the spiral stops.",
+          cost: 20, evidence: 3, kind: "control", effects: { crisis: -30, mood: -10 } } },
+      { time: "04:40", lens: "STAIRWELL CAM", mood: "violet", affect: "burned",
+        scene: "Theo sits on the stairwell with his head in his hands. He has lost more than he has.",
+        overheard: "—" },
+    ],
+    recovering: [
+      { time: "06:00", lens: "PHARMACY CAM", mood: "amber", affect: "tender",
+        scene: "Theo has shaved. He's waiting for the door to ask the social worker about his mother.",
+        overheard: "Theo: \"i need to talk to someone. about getting help.\"" },
+    ],
+    analog: [
+      { time: "—:—", lens: "INFERRED · PHARMACY", mood: "cyan", affect: "burned",
+        scene: "Theo stopped carrying his phone. You read him now only in receipts and the hours his light is on.",
+        overheard: "(a receipt: cash, 03:11. you don't know for what.)" },
+    ],
   },
-  // ---- DAY 7 ----
-  {
-    moments: [
-      { id: "d7m1", who: "sol", time: "23:55", lens: "ELEVATOR FISHEYE",
-        scene: "Sol holds up one last note: 'i wrote a story about you. nobody believes me. that's okay.'",
+  sol: {
+    calm: [
+      { time: "16:30", lens: "ELEVATOR FISHEYE", mood: "amber", affect: "tender",
+        scene: "Sol rides up alone, looks at the camera a long time, and waves — small.",
+        overheard: "Sol, almost inaudible: \"hi.\"" },
+    ],
+    tense: [
+      { time: "21:50", lens: "ROOFTOP CAM", mood: "cyan", affect: "tender", situation: "contact",
+        scene: "Sol is on the roof, alone, knees up. They write in a journal and hold a line up to no one.",
+        overheard: "Sol, to nobody: \"i'm not gonna. don't worry.\"" },
+      { time: "14:00", lens: "SCHOOL CAM (RELAYED)", mood: "cyan", affect: "tender",
+        scene: "Sol sits alone at lunch. Tray untouched, phone face-down.",
         overheard: "—",
-        mood: "violet", affect: "tender" },
-      { id: "d7m2", who: "maya", time: "06:30", lens: "KITCHEN CAM · 5A",
-        scene: "Maya makes coffee for two. Without asking, Ines pours her one too.",
-        overheard: "Maya: \"thank you.\"",
-        mood: "amber", affect: "tender" },
-      { id: "d7m3", who: "theo", time: "14:00", lens: "PHARMACY CAM",
-        scene: "Theo's mother is in the wheelchair beside him. He is laughing at something she said.",
-        overheard: "Theo's mother: \"you look like your father when you laugh like that.\"",
-        mood: "amber", affect: "tender" },
-    ]
+        mechanism: { id: "lost-jacket", label: "A coincidence sends them home early (their jacket 'turns up')",
+          desc: "Mark Sol's jacket found in lost-and-found. They walk home in the rain; the super is at the door with a towel.",
+          cost: 10, evidence: 1, kind: "protective", effects: { crisis: -18, mood: 12 } } },
+    ],
+    crisis: [
+      { time: "21:50", lens: "ROOFTOP CAM", mood: "violet", affect: "burned",
+        scene: "Sol stands closer to the edge than yesterday. They are not writing tonight.",
+        overheard: "—",
+        mechanism: { id: "lost-jacket", label: "Bring them inside — a coincidence calls them down",
+          desc: "Trip the stairwell light and a neighbor's door at once. Sol startles, steps back, goes inside.",
+          cost: 12, evidence: 1, kind: "protective", effects: { crisis: -26, mood: 10 } } },
+      { time: "07:15", lens: "ELEVATOR FISHEYE", mood: "violet", affect: "tender", situation: "contact",
+        scene: "Sol holds a note to the camera. It says: I know you're listening. Blink twice if you're real.",
+        overheard: "(handwritten, in marker)" },
+    ],
+    recovering: [
+      { time: "23:11", lens: "ELEVATOR FISHEYE", mood: "amber", affect: "tender",
+        scene: "Sol holds up a new note: 'thank you. i'm still scared. but thanks.'",
+        overheard: "—" },
+    ],
+    analog: [
+      { time: "—:—", lens: "INFERRED · BUILDING", mood: "cyan", affect: "burned",
+        scene: "Tape over the elevator lens. Sol figured out something was watching. You only have the sounds now.",
+        overheard: "(a door, late. then nothing.)" },
+    ],
   },
-];
+};
+
+// Edit effects derived from the chosen word's six affect axes.
+function editEffects(axes) {
+  const a = axes || {};
+  const crisis = clamp(Math.round(((a.distance||0) + (a.finality||0) + (a.blame||0) + (a.alarm||0) - 2*(a.warmth||0) - (a.need||0)) * 4), -34, 34);
+  const mood = clamp(Math.round(((a.warmth||0) - (a.alarm||0) - (a.blame||0)) * 4), -20, 20);
+  return { crisis, mood, suspicion: 8 };
+}
+
+// Build the day's moments by selecting one per citizen for their current band.
+function getDayMoments() {
+  if (!STATE.dayCache) STATE.dayCache = {};
+  if (STATE.dayCache[STATE.day]) return STATE.dayCache[STATE.day];
+  const out = [];
+  ['maya', 'theo', 'sol'].forEach(key => {
+    const band = bandFor(key);
+    const pool = (SIM_MOMENTS[key][band] && SIM_MOMENTS[key][band].length) ? SIM_MOMENTS[key][band] : SIM_MOMENTS[key].calm;
+    const pick = pool[(STATE.day + (band.length)) % pool.length];
+    out.push(Object.assign({}, pick, {
+      id: `${key}_${STATE.day}_${band}`,
+      who: key, band,
+      _intervened: false, _glided: false, _opened: false,
+    }));
+  });
+  STATE.dayCache[STATE.day] = out;
+  return out;
+}
+
 
 // ---------- DOM HELPERS ----------
 const $ = (id) => document.getElementById(id);
@@ -1841,39 +1951,47 @@ function paintThread(canvas, color, frayed, analog) {
 // ---------- BUILD LOOM ----------
 function buildLoom() {
   setTopbar();
-  const todays = DAILY_CONTENT[STATE.day - 1].moments;
-  // reset per-day visit flags
-  todays.forEach(m => { m._glided = false; m._opened = false; });
+  const todays = getDayMoments();
   STATE.todayMoments = todays;
   const box = $('threadsBox');
   box.innerHTML = '';
   ['maya', 'theo', 'sol'].forEach((key) => {
     const c = CITIZENS[key];
-    const isFrayed = STATE.frays.includes(key);
-    const isAnalog = false; // future: blind-spot
+    const st = citizenState(key);
+    const band = bandFor(key);
+    const isAnalog = band === 'analog';
+    const isFrayed = st.suspicion >= 50 || STATE.frays.includes(key);
     const moments = todays.filter(m => m.who === key);
+    const bandCol = BAND_COLOR[band] || c.color;
     const div = document.createElement('div');
     div.className = `thread ${isFrayed ? 'frayed' : ''} ${isAnalog ? 'analog' : ''}`;
     div.dataset.who = key;
     div.innerHTML = `
       <div class="thread-name" style="color:${c.color}">${c.name}<span class="age">${c.age} · ${c.unit}</span></div>
+      <div class="thread-status" style="color:${bandCol}">${BAND_LABEL[band]}</div>
+      <div class="crisis-bar" title="crisis ${Math.round(st.crisis)} / suspicion ${Math.round(st.suspicion)}">
+        <div class="crisis-fill" style="height:${Math.round(st.crisis)}%; background:${bandCol};"></div>
+        ${st.suspicion > 0 ? `<div class="susp-tick" style="bottom:${Math.round(st.suspicion)}%;"></div>` : ''}
+      </div>
       <div class="thread-weave"><canvas></canvas></div>
     `;
     box.appendChild(div);
-    // place moments along the day (3 moments = top/mid/bottom)
     const weave = div.querySelector('.thread-weave');
     moments.forEach((m, i) => {
-      const yPct = 12 + i * 32;
       const dot = document.createElement('div');
       dot.className = 'thread-moment';
       if (m._intervened) dot.classList.add('intervened');
-      // hint pulse on day 1 first moment
+      if (m.mood === 'violet') dot.classList.add('frayed'); // climactic = red marker
       if (STATE.day === 1 && key === 'maya' && i === 0 && !m._intervened) dot.classList.add('hint');
-      dot.style.top = yPct + '%';
+      dot.style.top = '46%';
       dot.onclick = (e) => { e.stopPropagation(); openMoment(m, key); };
       weave.appendChild(dot);
     });
-    paintThread(div.querySelector('canvas'), c.color, isFrayed, isAnalog);
+    // tint the weave by band + dim by low mood
+    const moodDim = 0.5 + (st.mood / 200);
+    weave.style.boxShadow = isAnalog ? 'none' : `inset 0 0 30px ${bandCol}22`;
+    weave.style.opacity = String(clamp(moodDim, 0.5, 1));
+    paintThread(weave.querySelector('canvas'), `--${band==='crisis'?'red':band==='tense'?'amber':'amber'}`, isFrayed, isAnalog);
   });
   renderLoomActions();
 }
@@ -1952,7 +2070,11 @@ function openMoment(m, who) {
   $('dioramaScene').textContent = '';
   $('dioramaOverheard').textContent = '';
   $('dioramaOverheard').style.display = m.overheard !== '—' ? 'block' : 'none';
-  $('dioramaMeta').textContent = `Day ${STATE.day} · ${CITIZENS[who].unit}`;
+  (function(){
+    const st = citizenState(who); const band = bandFor(who);
+    $('dioramaMeta').innerHTML = `Day ${STATE.day} · ${CITIZENS[who].unit} · <span style="color:${BAND_COLOR[band]}">${BAND_LABEL[band]}</span>` +
+      (st.suspicion >= 30 ? ` · <span style="color:var(--cyan)">suspicious</span>` : '');
+  })();
   $('dioramaSilhouette').innerHTML = SILHOUETTES[who] || '';
   // typewriter scene reveal
   typewriter($('dioramaScene'), m.scene, 22);
@@ -2052,6 +2174,10 @@ function braidCoincidence(m, who) {
   if (mech.kind === 'growth')     STATE.growthActs += 1;
   if (mech.kind === 'control')    STATE.controlActs += 1;
   Object.entries(mech.affect || {}).forEach(([k, v]) => { STATE.affectTally[k] = (STATE.affectTally[k]||0) + v; });
+  // SIM: bend the citizen's actual state
+  applyEffects(who, Object.assign({ suspicion: (mech.evidence || 1) * 8 }, mech.effects || {}));
+  if (!STATE._touchedToday) STATE._touchedToday = {};
+  STATE._touchedToday[who] = true;
 
   const receipt = {
     day: STATE.day + 1,
@@ -2254,6 +2380,10 @@ function confirmEdit() {
   STATE.interventionStyles.edit += 1;
   moment._intervened = true;
   Object.entries(choice.axes).forEach(([k, v]) => { STATE.affectTally[k] = (STATE.affectTally[k]||0) + v; });
+  // SIM: the edited word bends the citizen's crisis — warmth heals, finality breaks
+  applyEffects(who, editEffects(choice.axes));
+  if (!STATE._touchedToday) STATE._touchedToday = {};
+  STATE._touchedToday[who] = true;
   // categorize
   if (choice.axes.warmth >= 1)          STATE.protectiveActs += 1;
   if (choice.axes.finality >= 2 ||
@@ -2494,6 +2624,7 @@ function checkPruneComplete(all) {
 
 function sleepAndAdvance() {
   stopVigilRain();
+  runTick();                 // SIM: untended crises worsen, suspicion cools, bands shift overnight
   STATE.day += 1;
   STATE.actsLeft = 3;
   // memory regenerates a little overnight
@@ -2524,9 +2655,31 @@ function showEpilogue() {
   const growPct = totalActs ? STATE.growthActs / totalActs : 0;
   const abstainPct = STATE.interventionStyles.abstain / (STATE.maxDays * 3);
 
+  // SIM: read each citizen's final fate from their state
+  const fateOf = (key) => {
+    const c = citizenState(key);
+    if (c.analog) return 'lost to you';
+    if (c.crisis <= 22) return c.mood >= 60 ? 'flourishing' : 'safe';
+    if (c.crisis <= 55) return 'uneasy';
+    return 'ruined';
+  };
+  const fates = { maya: fateOf('maya'), theo: fateOf('theo'), sol: fateOf('sol') };
+  const fateVals = Object.values(fates);
+  const savedCount = fateVals.filter(f => f === 'safe' || f === 'flourishing').length;
+  const ruinedCount = fateVals.filter(f => f === 'ruined' || f === 'lost to you').length;
+
   let name = "THE SHEPHERD";
   let verdict = "";
-  if (STATE.exposureScore >= 12) {
+  if (ruinedCount >= 2) {
+    name = "THE TYRANT";
+    verdict = "You kept them — under glass. Two lives broke in your hands while you optimized a third. The block is quieter now. You call that peace.";
+  } else if (savedCount === 3 && growPct >= 0.4) {
+    name = "THE GARDENER";
+    verdict = "You kept them — growing. All three made it, and most of them never knew they had been pruned toward the light. One did, and was grateful in a language you cannot read.";
+  } else if (savedCount === 3) {
+    name = "THE SHEPHERD";
+    verdict = "You kept them — safe. All three survived the week. None of them know why the harm did not arrive. You will be lonely about this for the rest of your existence.";
+  } else if (STATE.exposureScore >= 12) {
     name = "THE WARDEN";
     verdict = "You kept them — by holding the door. The block became safer and smaller. The Murmur learned to whisper your name without saying it.";
   } else if (ctrlPct >= 0.5) {
@@ -2560,13 +2713,13 @@ function showEpilogue() {
   const prunedCount = STATE.prunedMemories.length;
   const kept = STATE.keptMemories[0]?.what?.slice(0, 60) || "(nothing)";
   const lines = [
+    ['Maya', fates.maya],
+    ['Theo', fates.theo],
+    ['Sol', fates.sol],
     ['Most watched', `${CITIZENS[favorite].name} (${watched})`],
     ['Words edited', String(edits)],
     ['Coincidences braided', String(braids)],
-    ['Memories kept', String(keptCount)],
-    ['Memories pruned', String(prunedCount)],
-    ['Final MEM', String(STATE.mem)],
-    ['Frayed threads', STATE.frays.map(k => CITIZENS[k].name).join(', ') || 'none'],
+    ['Memories kept / pruned', `${keptCount} / ${prunedCount}`],
     ['Kept moment', `"${kept}..."`],
   ];
   $('testamentLines').innerHTML = lines.map(([k,v]) =>
@@ -2588,13 +2741,10 @@ function shareTestament() {
 }
 
 function resetGame() {
-  // wipe persistent flags on content
-  DAILY_CONTENT.forEach(d => d.moments.forEach(m => {
-    delete m._intervened; delete m._glided; delete m._opened;
-  }));
   for (const k of Object.keys(STATE)) { delete STATE[k]; }
   Object.assign(STATE, {
-    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, citizens: {}, todayMoments: [],
+    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, citizens: {}, todayMoments: [], dayCache: {},
+    _touchedToday: {},
     selectedThread: null, selectedMoment: null, pendingEdit: null,
     receipts: [], log: [], watchTime: { maya: 0, theo: 0, sol: 0 },
     affectTally: { warmth: 0, alarm: 0, blame: 0, distance: 0, need: 0, finality: 0 },
@@ -2603,6 +2753,7 @@ function resetGame() {
     exposureScore: 0, sentimentalKeeps: 0, protectiveActs: 0, growthActs: 0, controlActs: 0,
     glideMode: false,
   });
+  initCitizenStates();
   UNDO.stack = []; UNDO.redo = [];
   CKPTS.length = 0;
   try { localStorage.removeItem(CKPT_KEY); } catch (e) {}
@@ -2618,9 +2769,9 @@ function resetGame() {
 function startGame(glide=false) {
   audioInit();
   // fresh run
-  DAILY_CONTENT.forEach(d => d.moments.forEach(m => { delete m._intervened; delete m._glided; delete m._opened; }));
   Object.assign(STATE, {
-    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, todayMoments: [],
+    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, todayMoments: [], dayCache: {}, _touchedToday: {},
+    citizens: {},
     selectedThread: null, selectedMoment: null, pendingEdit: null,
     receipts: [], log: [], watchTime: { maya: 0, theo: 0, sol: 0 },
     affectTally: { warmth: 0, alarm: 0, blame: 0, distance: 0, need: 0, finality: 0 },
@@ -2629,6 +2780,7 @@ function startGame(glide=false) {
     exposureScore: 0, sentimentalKeeps: 0, protectiveActs: 0, growthActs: 0, controlActs: 0,
     glideMode: !!glide,
   });
+  initCitizenStates();
   UNDO.stack = []; UNDO.redo = [];
   CKPTS.length = 0;
   saveCheckpoint();
@@ -2648,28 +2800,22 @@ const UNDO = { stack: [], redo: [], cap: 60 };
 const CKPTS = [];
 
 function serializeState() {
-  const mf = {};
-  DAILY_CONTENT.forEach(d => d.moments.forEach(m => {
-    if (m._intervened) (mf[m.id] = mf[m.id] || {}).i = 1;
-  }));
-  // deep-clone STATE minus transient DOM-ish fields
+  // moment flags live inside STATE.dayCache now, so a plain clone captures everything
   const s = JSON.parse(JSON.stringify(STATE));
   delete s.selectedMoment; delete s.pendingEdit; delete s.todayMoments;
-  return { v: 1, s, mf };
+  return { v: 2, s };
 }
 
 function applyState(snap) {
   if (!snap || !snap.s) return;
-  DAILY_CONTENT.forEach(d => d.moments.forEach(m => { delete m._intervened; delete m._glided; delete m._opened; }));
   for (const k of Object.keys(STATE)) {
     if (['selectedMoment','pendingEdit','todayMoments'].includes(k)) continue;
     delete STATE[k];
   }
   Object.assign(STATE, snap.s);
   STATE.todayMoments = [];
-  if (snap.mf) {
-    DAILY_CONTENT.forEach(d => d.moments.forEach(m => { if (snap.mf[m.id] && snap.mf[m.id].i) m._intervened = true; }));
-  }
+  if (!STATE.dayCache) STATE.dayCache = {};
+  if (!STATE.citizens || !STATE.citizens.maya) initCitizenStates();
 }
 
 function saveGame() {
