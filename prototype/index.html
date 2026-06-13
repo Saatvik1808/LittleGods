@@ -1784,6 +1784,11 @@ const ART_MANIFEST = {
   "maya_crisis": "maya_crisis.jpg",
   "theo_crisis": "theo_crisis.jpg",
   "sol_crisis": "sol_crisis.jpg",
+  // until tense-specific art exists, reuse the crisis paintings for tense too
+  // (so every danger-band moment is painted). Replace when tense art is added.
+  "maya_tense": "maya_crisis.jpg",
+  "theo_tense": "theo_crisis.jpg",
+  "sol_tense": "sol_crisis.jpg",
 };
 function setDioramaArt(who, band, override) {
   const frame = document.getElementById('dioramaFrame');
