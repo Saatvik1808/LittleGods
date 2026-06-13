@@ -1,0 +1,2803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon-192.svg">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+<title>LITTLE GODS — First Watch</title>
+<style>
+:root {
+  --bg: #0a0a0c;
+  --bg-soft: #14141a;
+  --ink: #e8e4d6;
+  --ink-dim: #8b8678;
+  --ink-faint: #4a4738;
+  --amber: #d4a04a;
+  --amber-hot: #f0b85a;
+  --cyan: #4a8fb8;
+  --violet: #9a6b9c;
+  --red: #b85850;
+  --thread-maya: #d4a04a;
+  --thread-theo: #4a8fb8;
+  --thread-sol: #9a6b9c;
+  --font-serif: ui-serif, Georgia, "Iowan Old Style", "Apple Garamond", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+#app {
+  max-width: 420px;
+  margin: 0 auto;
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; }
+.screen.active { display: flex; }
+.fade-in { animation: fadeIn .6s ease both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- TOP BAR ---------- */
+.topbar {
+  padding: 14px 18px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.topbar .day { color: var(--amber); }
+.topbar .mem { color: var(--ink-dim); }
+.topbar .mem .num { color: var(--ink); }
+
+/* ---------- COVER ---------- */
+#cover {
+  background: radial-gradient(ellipse at center, #1a1410 0%, var(--bg) 70%);
+  justify-content: flex-start;
+  align-items: center;
+  padding: 40px 28px 32px;
+  text-align: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#cover h1 {
+  font-size: 34px;
+  font-weight: 400;
+  letter-spacing: .08em;
+  color: var(--amber);
+  margin-bottom: 6px;
+  margin-top: 8px;
+}
+#cover .sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+#cover .quote {
+  font-style: italic;
+  color: var(--ink-dim);
+  font-size: 14px;
+  max-width: 320px;
+  margin-bottom: 30px;
+  line-height: 1.55;
+}
+#cover .quote em { color: var(--amber); font-style: italic; }
+.btn {
+  background: none;
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  padding: 14px 28px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+  font-weight: 400;
+}
+.btn:hover, .btn:active { border-color: var(--amber); color: var(--amber); }
+.btn.primary { border-color: var(--amber); color: var(--amber); }
+.btn.primary:hover, .btn.primary:active { background: var(--amber); color: var(--bg); }
+.btn.ghost { border-color: var(--ink-faint); color: var(--ink-dim); font-size: 11px; padding: 10px 18px; }
+
+/* ---------- LOOM ---------- */
+#loom { background: var(--bg); }
+.loom-header {
+  padding: 4px 18px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.threads {
+  flex: 1;
+  display: flex;
+  padding: 8px 18px 16px;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+}
+.thread-name {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+  text-align: center;
+}
+.thread-name .age { color: var(--ink-faint); font-size: 8px; display: block; margin-top: 2px; }
+.thread-weave {
+  flex: 1;
+  position: relative;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255,255,255,.015);
+  border: 1px solid rgba(255,255,255,.03);
+}
+.thread-weave canvas { display: block; width: 100%; height: 100%; }
+.thread.selected .thread-weave { border-color: var(--amber); box-shadow: 0 0 24px rgba(212,160,74,.2); }
+.thread.frayed .thread-weave::after {
+  content: "FRAY";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--red);
+  letter-spacing: .15em;
+}
+.thread.analog .thread-weave {
+  filter: contrast(0.4) brightness(0.6);
+  background: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,.03) 3px 4px);
+}
+.thread-moment {
+  position: absolute;
+  left: 0; right: 0;
+  height: 8px;
+  background: var(--amber);
+  opacity: .9;
+  cursor: pointer;
+  border-radius: 1px;
+}
+.thread-moment.intervened { background: var(--cyan); animation: none; }
+.thread-moment.frayed { background: var(--red); }
+.thread-moment {
+  animation: momentPulse 2.6s ease-in-out infinite;
+  box-shadow: 0 0 8px currentColor;
+}
+.thread-moment.hint {
+  animation: momentHint 1.4s ease-in-out infinite;
+  transform: scale(1.4);
+}
+@keyframes momentPulse {
+  0%, 100% { opacity: .7; transform: scaleX(.9); }
+  50% { opacity: 1; transform: scaleX(1.05); }
+}
+@keyframes momentHint {
+  0%, 100% { opacity: .8; box-shadow: 0 0 4px var(--amber); }
+  50% { opacity: 1; box-shadow: 0 0 24px var(--amber-hot), 0 0 40px var(--amber); }
+}
+.thread-weave { animation: weaveBreath 6s ease-in-out infinite; }
+@keyframes weaveBreath {
+  0%, 100% { filter: brightness(.92) contrast(1); }
+  50% { filter: brightness(1.08) contrast(1.05); }
+}
+.tap-arrow {
+  position: absolute;
+  pointer-events: none;
+  color: var(--amber);
+  font-size: 22px;
+  animation: tapArrow 1.4s ease-in-out infinite;
+  z-index: 10;
+}
+@keyframes tapArrow {
+  0%, 100% { transform: translate(0, 0); opacity: .9; }
+  50% { transform: translate(0, 6px); opacity: 1; }
+}
+
+/* ---------- DAY TRANSITION ---------- */
+.day-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  font-family: var(--font-serif);
+  pointer-events: none;
+  overflow: hidden;
+  animation: dayFade 4.6s ease-out forwards;
+}
+.day-overlay canvas.block3d {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0;
+}
+.day-overlay .day-text {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 14vh;
+  text-shadow: 0 2px 20px rgba(0,0,0,.9);
+}
+.day-overlay .day-grad {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 40%, rgba(10,10,12,.4) 70%, rgba(10,10,12,.92) 100%);
+  pointer-events: none;
+}
+.day-overlay .label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .3em;
+  color: var(--amber);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  opacity: .85;
+}
+.day-overlay .num {
+  font-size: 64px;
+  color: var(--ink);
+  letter-spacing: .12em;
+  font-weight: 400;
+}
+.day-overlay .epigraph {
+  margin-top: 14px;
+  font-style: italic;
+  color: var(--ink-dim);
+  font-size: 13px;
+  max-width: 300px;
+  text-align: center;
+  line-height: 1.5;
+}
+.day-overlay .skip {
+  position: absolute;
+  bottom: 18px; right: 18px;
+  z-index: 3;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 8px;
+}
+@keyframes dayFade {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  86%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- CHAT REALISM ---------- */
+.bubble .ts {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  letter-spacing: .08em;
+  margin-top: 4px;
+  text-transform: uppercase;
+  opacity: .6;
+}
+.bubble.sent .ts { text-align: right; }
+.bubble.sent .ts.read { color: var(--cyan); opacity: .9; }
+.bubble.recv .ts { text-align: left; }
+.bubble.swap-target {
+  position: relative;
+}
+.bubble .swap {
+  background: rgba(212,160,74,.18);
+  padding: 1px 4px;
+  border-radius: 3px;
+  animation: swapPulse 2s ease-in-out infinite;
+}
+@keyframes swapPulse {
+  0%, 100% { background: rgba(212,160,74,.10); }
+  50% { background: rgba(212,160,74,.32); }
+}
+.typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 2px;
+}
+.typing-dots span {
+  width: 6px; height: 6px;
+  background: var(--ink-dim);
+  border-radius: 50%;
+  animation: typingBob 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .15s; }
+.typing-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes typingBob {
+  0%, 80%, 100% { opacity: .3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+.affect-preview {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  text-align: center;
+  margin: 4px 0 14px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  min-height: 14px;
+  transition: color .3s;
+}
+.affect-preview.warm { color: var(--amber-hot); }
+.affect-preview.cold { color: var(--cyan); }
+.affect-preview.burned { color: var(--red); }
+.affect-preview.tender { color: #c896d8; }
+.affect-preview.neutral { color: var(--ink-dim); }
+
+/* ---------- DIORAMA VISUAL LAYERS ---------- */
+.diorama-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.diorama-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .35;
+  background-image: repeating-linear-gradient(105deg, transparent 0 12px, rgba(232,228,214,.10) 12px 13px);
+  animation: rainSlide 1.8s linear infinite;
+}
+@keyframes rainSlide {
+  from { background-position: 0 0; }
+  to { background-position: -160px 100px; }
+}
+.diorama-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .12;
+  mix-blend-mode: overlay;
+  background-image: radial-gradient(circle at 50% 50%, transparent 0, rgba(0,0,0,.7) 100%);
+}
+.diorama-silhouette {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 50%;
+  pointer-events: none;
+  opacity: .85;
+  filter: blur(.2px);
+}
+.diorama-window-light {
+  position: absolute;
+  top: -10%;
+  right: -5%;
+  width: 65%;
+  height: 70%;
+  background: radial-gradient(ellipse at top right, rgba(240,184,90,.40), transparent 60%);
+  pointer-events: none;
+  animation: windowFlicker 6s ease-in-out infinite;
+}
+@keyframes windowFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .82; }
+}
+.diorama-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px 20px rgba(0,0,0,.8);
+  border-radius: 1px;
+}
+.diorama-frame {
+  flex: 1;
+  margin: 60px 18px 16px;
+}
+.diorama-actions .btn { padding: 16px 20px; min-height: 56px; }
+.diorama-actions .btn span { font-size: 11px; }
+
+/* ---------- LOOM TIME BAR ---------- */
+.time-bar {
+  margin: 0 18px 8px;
+  height: 4px;
+  background: rgba(255,255,255,.05);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.time-bar .fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--amber) 0%, var(--violet) 100%);
+  width: 0%;
+  transition: width .6s ease;
+}
+.time-bar .marker {
+  position: absolute;
+  top: -2px;
+  width: 2px; height: 8px;
+  background: var(--amber-hot);
+  box-shadow: 0 0 6px var(--amber-hot);
+}
+
+/* ---------- INTERVENTION DOTS ---------- */
+.act-dots {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.act-dots .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  border: 1px solid var(--amber);
+  transition: all .3s;
+}
+.act-dots .dot.full { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+/* ---------- BIG BUTTONS ---------- */
+.btn { min-height: 48px; }
+.btn.primary { min-height: 52px; }
+
+.loom-actions {
+  padding: 12px 18px 24px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.action-pill {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink-dim);
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  border-radius: 18px;
+  cursor: pointer;
+}
+.action-pill.hot { color: var(--amber); border-color: var(--amber); }
+.action-pill:disabled { opacity: .3; cursor: not-allowed; }
+
+.loom-footer {
+  padding: 0 18px 18px;
+  text-align: center;
+}
+.loom-footer .day-end {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 12px;
+}
+.loom-footer .day-end:hover { color: var(--amber); }
+.interventions-left {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.interventions-left .n { color: var(--amber); }
+
+/* ---------- DIORAMA ---------- */
+#diorama {
+  background: var(--bg);
+  padding: 0;
+}
+.diorama-frame {
+  flex: 1;
+  margin: 60px 24px 20px;
+  border: 1px solid var(--ink-faint);
+  background: linear-gradient(160deg, #1a1410 0%, #0a0808 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 24px;
+}
+.diorama-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(240,184,90,.25), transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+/* cinematic ken-burns stage holding parallax layers */
+.diorama-stage {
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  pointer-events: none;
+  transform-origin: 40% 35%;
+  animation: kenBurns 16s ease-out forwards;
+}
+@keyframes kenBurns {
+  0%   { transform: scale(1.0) translate(0, 0); }
+  100% { transform: scale(1.16) translate(-3%, -2%); }
+}
+.diorama-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.diorama-scanline {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.10) 2px 3px);
+  opacity: .5;
+}
+.diorama-tick {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  animation: dioramaTick 7s steps(1) infinite;
+}
+@keyframes dioramaTick {
+  0%, 96%, 100% { opacity: 0; }
+  97% { opacity: .04; transform: translateY(1px); }
+  98% { opacity: 0; transform: translateY(-1px); }
+}
+.diorama-lens {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--amber);
+  opacity: .7;
+}
+.diorama-lens::before { content: "● REC "; color: var(--red); }
+.diorama-time {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .15em;
+  color: var(--ink-dim);
+}
+.diorama-scene {
+  position: relative;
+  z-index: 1;
+  font-style: italic;
+  color: #f2efe4;
+  font-size: 17px;
+  line-height: 1.72;
+  letter-spacing: .01em;
+  margin-bottom: 18px;
+  text-shadow: 0 1px 16px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.6);
+  text-wrap: balance;
+}
+.diorama-scene::first-letter {
+  font-size: 30px;
+  font-style: normal;
+  color: var(--amber);
+  line-height: 1;
+  padding-right: 1px;
+}
+.diorama-overheard {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: .03em;
+  border-left: 2px solid var(--amber);
+  padding-left: 10px;
+  margin-bottom: 16px;
+  font-style: normal;
+}
+.diorama-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-faint);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.diorama-actions {
+  padding: 0 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- CHAT / EDIT ---------- */
+#chat { background: var(--bg-soft); }
+.chat-header {
+  padding: 18px;
+  border-bottom: 1px solid var(--ink-faint);
+  text-align: center;
+}
+.chat-header .who {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.chat-header .who .from { color: var(--ink); }
+.chat-header .frame {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--amber);
+  letter-spacing: .25em;
+  margin-top: 4px;
+}
+.chat-frame {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--amber);
+  text-align: center;
+  padding: 8px;
+  letter-spacing: .25em;
+}
+.chat-stream {
+  flex: 1;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.bubble.sent { align-self: flex-end; background: #1f3a5f; color: var(--ink); border-bottom-right-radius: 4px; }
+.bubble.recv { align-self: flex-start; background: #2a2a30; color: var(--ink); border-bottom-left-radius: 4px; }
+.bubble.editing { outline: 2px solid var(--amber); box-shadow: 0 0 20px rgba(212,160,74,.3); }
+.bubble .swap { color: var(--amber); border-bottom: 1px dashed var(--amber); }
+.bubble .meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  letter-spacing: .1em;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.bubble.recv.pending { opacity: .5; font-style: italic; }
+.edit-tray {
+  padding: 16px 18px 24px;
+  border-top: 1px solid var(--ink-faint);
+  background: var(--bg);
+}
+.edit-prompt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.edit-options {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.word-chip {
+  background: var(--bg-soft);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  padding: 10px 16px;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  border-radius: 22px;
+  cursor: pointer;
+  position: relative;
+}
+.word-chip:hover { border-color: var(--amber); }
+.word-chip.selected { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+.word-chip .axes {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 7px;
+  color: var(--ink-faint);
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+.word-chip.selected .axes { color: var(--amber); }
+.edit-confirm { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
+
+/* ---------- VIGIL ---------- */
+#vigil {
+  background: linear-gradient(180deg, #0a0a0c 0%, #14101a 100%);
+}
+.vigil-header {
+  text-align: center;
+  padding: 30px 18px 8px;
+}
+.vigil-header h2 {
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: .15em;
+  color: var(--violet);
+  text-transform: uppercase;
+}
+.vigil-header .sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: .25em;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+.vigil-body { flex: 1; padding: 18px; overflow-y: auto; }
+.receipt {
+  border: 1px solid var(--ink-faint);
+  background: rgba(255,255,255,.02);
+  padding: 14px;
+  margin-bottom: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.receipt .head {
+  color: var(--amber);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  font-size: 9px;
+  margin-bottom: 8px;
+}
+.receipt .line { display: flex; justify-content: space-between; padding: 2px 0; }
+.receipt .line .k { color: var(--ink-dim); }
+.receipt .unintended {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ink-faint);
+  color: var(--red);
+  font-style: italic;
+}
+.prune-prompt {
+  font-style: italic;
+  color: var(--violet);
+  text-align: center;
+  padding: 20px 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.memory {
+  border: 1px solid var(--ink-faint);
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  background: rgba(255,255,255,.02);
+}
+.memory.keeping { border-color: var(--amber); background: rgba(212,160,74,.10); box-shadow: 0 0 24px rgba(212,160,74,.18); }
+.memory.pruning { border-color: var(--red); background: rgba(184,88,80,.06); opacity: .35; filter: blur(.5px); transform: scale(.98); }
+.memory .what { font-style: italic; color: var(--ink); font-size: 14px; margin-bottom: 6px; }
+.memory .meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.memory .meta .who { color: var(--amber); }
+.memory .row { display: flex; gap: 8px; margin-top: 4px; }
+.memory .pill {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--ink-faint);
+  color: var(--ink-dim);
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all .2s;
+}
+.memory .pill.keep { color: var(--amber); border-color: var(--amber); }
+.memory .pill.keep:hover, .memory .pill.keep.active { background: var(--amber); color: var(--bg); }
+.memory .pill.prune { color: var(--red); border-color: var(--red); }
+.memory .pill.prune:hover, .memory .pill.prune.active { background: var(--red); color: var(--bg); }
+.memory.decided .pill { opacity: .3; pointer-events: none; }
+.memory.decided .pill.active { opacity: 1; }
+.memory .prune-cost { font-family: var(--font-mono); font-size: 9px; color: var(--ink-faint); margin-top: 6px; letter-spacing: .12em; text-transform: uppercase; }
+.prune-tally {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+.prune-tally .keep-c { color: var(--amber); }
+.prune-tally .prune-c { color: var(--red); }
+.prune-tally .pending-c { color: var(--ink-dim); }
+.vigil-footer { padding: 14px 18px 24px; text-align: center; }
+
+/* ---------- TOAST ---------- */
+.toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-soft);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  padding: 10px 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity .3s;
+  z-index: 100;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* ---------- EPILOGUE ---------- */
+#epilogue {
+  background: radial-gradient(ellipse at center, #14101a 0%, var(--bg) 70%);
+  padding: 40px 28px;
+  justify-content: center;
+}
+#epilogue h2 {
+  font-size: 14px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-align: center;
+  font-weight: 400;
+}
+#epilogue h1 {
+  font-size: 32px;
+  color: var(--amber);
+  letter-spacing: .12em;
+  margin-bottom: 24px;
+  text-align: center;
+  font-weight: 400;
+}
+#epilogue .verdict {
+  font-style: italic;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: center;
+  margin-bottom: 32px;
+  max-width: 340px;
+  align-self: center;
+}
+.testament {
+  border: 1px solid var(--amber);
+  padding: 18px;
+  margin-bottom: 24px;
+  background: rgba(212,160,74,.04);
+}
+.testament .head {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--amber);
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.testament .line {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 0;
+}
+.testament .line .k { color: var(--ink-dim); letter-spacing: .1em; text-transform: uppercase; }
+.testament .line .v { color: var(--ink); }
+#epilogue .actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ============ COVER ============ -->
+<section id="cover" class="screen active">
+  <h1>LITTLE GODS</h1>
+  <div class="sub">First Watch · Prototype</div>
+  <div class="quote">You are a dying woman's homemade god. You watch three lives. You change one word. <em>Keep them ——</em></div>
+
+  <div style="display:flex; gap:10px; justify-content:center; margin-bottom:28px; max-width:320px;">
+    <div style="flex:1; text-align:center;">
+      <div style="font-size:22px; color:var(--amber); margin-bottom:4px;">◉</div>
+      <div style="font-family:var(--font-mono); font-size:9px; color:var(--ink-dim); letter-spacing:.15em; text-transform:uppercase; line-height:1.5;">Watch</div>
+    </div>
+    <div style="flex:1; text-align:center;">
+      <div style="font-size:22px; color:var(--cyan); margin-bottom:4px;">✎</div>
+      <div style="font-family:var(--font-mono); font-size:9px; color:var(--ink-dim); letter-spacing:.15em; text-transform:uppercase; line-height:1.5;">Edit a word</div>
+    </div>
+    <div style="flex:1; text-align:center;">
+      <div style="font-size:22px; color:var(--violet); margin-bottom:4px;">🜂</div>
+      <div style="font-family:var(--font-mono); font-size:9px; color:var(--ink-dim); letter-spacing:.15em; text-transform:uppercase; line-height:1.5;">Bend fate</div>
+    </div>
+  </div>
+
+  <button id="beginBtn" class="btn primary" style="min-width: 220px; position: relative; z-index: 5;">Begin · 7 nights</button>
+  <div style="height:12px"></div>
+  <button id="glideBtn" class="btn ghost" style="min-width: 220px; position: relative; z-index: 5;">Glide mode · easy</button>
+  <div style="height:20px"></div>
+  <div style="font-family:var(--font-mono); font-size:9px; color:var(--ink-faint); letter-spacing:.18em; text-transform:uppercase; max-width:300px; text-align:center; line-height:1.7;">
+    ~5 min per night · headphones ideal
+  </div>
+</section>
+
+<!-- ============ LOOM ============ -->
+<section id="loom" class="screen">
+  <div class="topbar">
+    <div class="day">Day <span id="dayNum">1</span> / 7</div>
+    <div style="display:flex; gap:14px; align-items:center;">
+      <button id="muteBtn" onclick="toggleAudio()" style="background:none; border:none; color:var(--ink-dim); font-size:16px; cursor:pointer; padding:0;">♪</button>
+      <div class="mem">MEM <span class="num" id="memVal">1000</span></div>
+    </div>
+  </div>
+  <div class="loom-header">The Loom · tap a glowing moment to open</div>
+  <div class="time-bar"><div class="fill" id="timeBarFill"></div></div>
+  <div class="threads" id="threadsBox"></div>
+  <div style="text-align:center;">
+    <div class="interventions-left">Interventions left: <span class="act-dots" id="actDots"></span></div>
+  </div>
+  <div class="loom-actions" id="loomActions"></div>
+  <div class="loom-footer">
+    <div class="day-end" onclick="enterVigil()">→ End day · enter the Vigil</div>
+  </div>
+</section>
+
+<!-- ============ DIORAMA ============ -->
+<section id="diorama" class="screen">
+  <div class="topbar">
+    <div class="day" id="dioramaWho">—</div>
+    <div class="mem">−<span class="num" id="dioramaCost">8</span> MEM to watch</div>
+  </div>
+  <div class="diorama-frame" id="dioramaFrame">
+    <div class="diorama-stage" id="dioramaStage">
+      <div class="diorama-window-light"></div>
+      <div class="diorama-silhouette" id="dioramaSilhouette"></div>
+    </div>
+    <canvas class="diorama-particles" id="dioramaParticles"></canvas>
+    <div class="diorama-rain" id="dioramaRain"></div>
+    <div class="diorama-vignette"></div>
+    <div class="diorama-grain"></div>
+    <div class="diorama-scanline"></div>
+    <div class="diorama-tick"></div>
+    <div class="diorama-lens" id="dioramaLens">DOORBELL CAM · 5A</div>
+    <div class="diorama-time" id="dioramaTime">07:42</div>
+    <div class="diorama-scene" id="dioramaScene" style="z-index:4;">…</div>
+    <div class="diorama-overheard" id="dioramaOverheard" style="z-index:4;"></div>
+    <div class="diorama-meta" id="dioramaMeta" style="z-index:4;">—</div>
+  </div>
+  <div class="diorama-actions" id="dioramaActions"></div>
+</section>
+
+<!-- ============ CHAT / ONE-WORD EDIT ============ -->
+<section id="chat" class="screen">
+  <div class="chat-header">
+    <div class="who"><span class="from" id="chatFrom">MAYA</span> → <span id="chatTo">INES</span></div>
+    <div class="frame">INTERCEPT · IN TRANSIT</div>
+  </div>
+  <div class="chat-stream" id="chatStream"></div>
+  <div class="edit-tray">
+    <div class="edit-prompt">Replace <span id="editTarget" style="color:var(--amber)">·</span> — drawn from <span id="editFrom">Maya</span>'s own vocabulary</div>
+    <div class="edit-options" id="editOptions"></div>
+    <div class="affect-preview" id="affectPreview"></div>
+    <div class="edit-confirm">
+      <button class="btn ghost" onclick="cancelEdit()">Let it send</button>
+      <button class="btn primary" id="confirmEditBtn" onclick="confirmEdit()" disabled>Send the edit</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VIGIL ============ -->
+<section id="vigil" class="screen">
+  <div class="vigil-header">
+    <h2>The Vigil</h2>
+    <div class="sub">Night of Day <span id="vigilDay">1</span></div>
+  </div>
+  <div class="vigil-body" id="vigilBody"></div>
+  <div class="vigil-footer">
+    <button class="btn" id="vigilNextBtn" onclick="sleepAndAdvance()" disabled>Sleep · Day Begins Again</button>
+  </div>
+</section>
+
+<!-- ============ EPILOGUE ============ -->
+<section id="epilogue" class="screen">
+  <h2>The Mirror's Verdict</h2>
+  <h1 id="endingName">—</h1>
+  <div class="verdict" id="endingVerdict">—</div>
+  <div class="testament">
+    <div class="head">The Testament</div>
+    <div id="testamentLines"></div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" onclick="resetGame()">Begin again · NG+ Echo</button>
+    <button class="btn ghost" onclick="shareTestament()">Copy Testament</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+// ============================================================
+// LITTLE GODS — First Watch (prototype)
+// One-file vanilla JS. No deps. Mobile-portrait.
+// ============================================================
+
+// ---------- STATE ----------
+const STATE = {
+  day: 1,
+  maxDays: 7,
+  mem: 1000,
+  actsLeft: 3,
+  citizens: {},
+  todayMoments: [],
+  selectedThread: null,
+  selectedMoment: null,
+  pendingEdit: null,
+  receipts: [],          // arrives day after intervention
+  log: [],               // permanent intervention log
+  watchTime: { maya: 0, theo: 0, sol: 0 },
+  affectTally: { warmth: 0, alarm: 0, blame: 0, distance: 0, need: 0, finality: 0 },
+  interventionStyles: { coincidence: 0, edit: 0, abstain: 0 },
+  keptMemories: [],
+  prunedMemories: [],
+  frays: [],
+  exposureScore: 0,
+  sentimentalKeeps: 0,
+  protectiveActs: 0,
+  growthActs: 0,
+  controlActs: 0,
+};
+
+// ---------- CITIZENS ----------
+const CITIZENS = {
+  maya: {
+    name: "MAYA", full: "Maya Okafor", age: 38, unit: "5A",
+    color: "var(--thread-maya)",
+    blurb: "Gives the wedding toast everyone screenshots. Her own marriage is one text from breaking.",
+    vocab: {
+      // (target word) → 3 replacements from Maya's own corpus tagged on affect axes
+      "fine": [
+        { word: "tired",   axes: { warmth: -1, alarm:  0, blame:  0, distance:  1, need:  1, finality:  0 }, label: "Tired" },
+        { word: "leaving", axes: { warmth: -2, alarm:  2, blame:  1, distance:  3, need:  0, finality:  3 }, label: "Cold" },
+        { word: "okay",    axes: { warmth:  1, alarm:  0, blame:  0, distance:  0, need:  0, finality: -1 }, label: "Warm" },
+      ],
+      "soon": [
+        { word: "tonight", axes: { warmth:  1, alarm:  0, blame:  0, distance: -2, need:  2, finality:  1 }, label: "Closer" },
+        { word: "never",   axes: { warmth: -3, alarm:  2, blame:  2, distance:  3, need: -1, finality:  3 }, label: "Burned" },
+        { word: "maybe",   axes: { warmth:  0, alarm:  1, blame:  1, distance:  2, need:  0, finality:  0 }, label: "Distance" },
+      ],
+    },
+    msgsBySituation: {
+      "marriage": {
+        from: "Maya", to: "Ines",
+        thread: [
+          { side: "recv", text: "are you coming home for dinner?" },
+          { side: "sent", text: "yeah it's fine, see you soon", editable: true, targets: ["fine", "soon"] },
+        ],
+        repliesByAffect: {
+          warm:    "ok love. i'll wait up.",
+          neutral: "ok.",
+          cold:    "don't bother. i ate.",
+          burned:  "i think we should talk when you get here.",
+          tender:  "i was hoping you'd say that.",
+        },
+      }
+    },
+  },
+  theo: {
+    name: "THEO", full: "Theo Vasquez", age: 34, unit: "3B",
+    color: "var(--thread-theo)",
+    blurb: "Night-shift nurse. Gambling debt that began as his mother's care bills. Shame mistaken for laziness.",
+    vocab: {
+      "tonight": [
+        { word: "tomorrow", axes: { warmth: 0, alarm: -1, blame: 0, distance: 1, need: -1, finality: 0 }, label: "Defer" },
+        { word: "soon",     axes: { warmth: 0, alarm:  0, blame: 0, distance: 1, need:  0, finality: 0 }, label: "Vague" },
+        { word: "never",    axes: { warmth: -2, alarm: 3, blame: 3, distance: 3, need: -1, finality: 3 }, label: "Cut" },
+      ],
+      "double": [
+        { word: "single",  axes: { warmth: 1, alarm: -2, blame: -1, distance: 0, need: 0, finality: -1 }, label: "Smaller" },
+        { word: "triple",  axes: { warmth: -1, alarm: 3, blame: 1, distance: -1, need: 2, finality: 1 }, label: "Spiral" },
+        { word: "nothing", axes: { warmth: 2, alarm: -3, blame: -2, distance: 0, need: -3, finality: 2 }, label: "Out" },
+      ],
+    },
+    msgsBySituation: {
+      "debt": {
+        from: "Theo", to: "Marcus",
+        thread: [
+          { side: "recv", text: "you in for tonight? we're at the place." },
+          { side: "sent", text: "yeah. one double. then i'm out.", editable: true, targets: ["tonight", "double"] },
+        ],
+        repliesByAffect: {
+          warm:    "no worries man. another time.",
+          neutral: "cool. see you here.",
+          cold:    "ok bro. you good?",
+          burned:  "wait. you ok?",
+          tender:  "proud of you man. for real.",
+        },
+      }
+    },
+  },
+  sol: {
+    name: "SOL", full: "Sol Marsh", age: 16, unit: "6D",
+    color: "var(--thread-sol)",
+    blurb: "Talks to the elevator like it's listening. Because it is.",
+    vocab: {
+      "alone": [
+        { word: "ready",  axes: { warmth: 1, alarm: 0, blame: 0, distance: -1, need: 0, finality: 0 }, label: "Brave" },
+        { word: "scared", axes: { warmth: 0, alarm: 2, blame: 0, distance: 1, need: 3, finality: 0 }, label: "Honest" },
+        { word: "fine",   axes: { warmth: -1, alarm: -1, blame: 0, distance: 2, need: -2, finality: 1 }, label: "Mask" },
+      ],
+      "real": [
+        { word: "awake",   axes: { warmth: 1, alarm: 1, blame: 0, distance: -2, need: 2, finality: 0 }, label: "Closer" },
+        { word: "dreaming", axes: { warmth: 0, alarm: 0, blame: 0, distance: 2, need: 0, finality: 0 }, label: "Soften" },
+        { word: "watching", axes: { warmth: -1, alarm: 3, blame: 0, distance: 0, need: 0, finality: 1 }, label: "Blunt" },
+      ],
+    },
+    msgsBySituation: {
+      "contact": {
+        from: "Sol", to: "Self (journal)",
+        thread: [
+          { side: "sent", text: "told mom i'm fine. she didn't ask twice.", editable: false },
+          { side: "sent", text: "i think the building is alone. or i am. i don't know which is real.", editable: true, targets: ["alone", "real"] },
+        ],
+        repliesByAffect: {
+          warm:    "(no reply — the journal closes. Sol smiles at the elevator camera.)",
+          neutral: "(no reply — the journal closes.)",
+          cold:    "(no reply — the journal closes harder than it opened.)",
+          burned:  "(Sol stares at the camera for 14 seconds. Tape appears the next morning.)",
+          tender:  "(Sol whispers thanks to nothing in particular. The elevator hums back.)",
+        },
+      }
+    },
+  },
+};
+
+// ---------- DAILY CONTENT (authored beacon moments per citizen per day) ----------
+// Each moment: { id, who, time, lens, scene, overheard, mood, situation? (chat-able), mechanism? (coincidence-able), affectIfWatched }
+const DAILY_CONTENT = [
+  // ---- DAY 1 ----
+  {
+    moments: [
+      { id: "d1m1", who: "maya", time: "07:42", lens: "DOORBELL CAM · 5A",
+        scene: "Maya leaves without breakfast. Ines watches her from the kitchen and does not call out.",
+        overheard: "Ines, alone, to the coffee pot: \"she said fine again.\"",
+        mood: "amber", affect: "tender", situation: "marriage" },
+      { id: "d1m2", who: "theo", time: "11:18", lens: "PHARMACY CAM · LOBBY",
+        scene: "Theo signs for his mother's prescription. Counts cash three times. Recounts it.",
+        overheard: "pharmacist: \"insurance still won't cover the new one.\"",
+        mood: "amber", affect: "neutral",
+        mechanism: { id: "delay-elevator", label: "Elevator delay (Theo skips lunch shift, eats with mother)",
+                     desc: "Stall the freight elevator with a thermal flag. Theo returns to 3B for lunch — sees his mother awake for the first time this week.",
+                     cost: 12, evidence: 1, affect: { warmth: 1, alarm: -1, blame: -1, need: -1 }, kind: "protective" } },
+      { id: "d1m3", who: "sol", time: "16:30", lens: "ELEVATOR FISHEYE",
+        scene: "Sol rides up alone. Looks at the camera for a long time. Then waves, small.",
+        overheard: "Sol, almost inaudible: \"hi.\"",
+        mood: "amber", affect: "tender", situation: "contact" },
+    ]
+  },
+  // ---- DAY 2 ----
+  {
+    moments: [
+      { id: "d2m1", who: "theo", time: "02:14", lens: "PHONE INTERCEPT",
+        scene: "Theo and Marcus, two floors apart, are texting about money.",
+        overheard: "Marcus: \"you in for tonight? we're at the place.\"",
+        mood: "amber", affect: "neutral", situation: "debt" },
+      { id: "d2m2", who: "maya", time: "09:01", lens: "HALLWAY CAM · 5",
+        scene: "Maya pauses outside 5A. Adjusts her hair in the mirrored sconce. Goes back in.",
+        overheard: "—",
+        mood: "amber", affect: "tender",
+        mechanism: { id: "lost-keys", label: "Keys 'fall' (Ines finds them, opens the door, meets Maya in the threshold)",
+                     desc: "Magnetically drop Maya's keys behind the doormat. Ines opens the door to bring out the recycling and finds her, frozen in the hall.",
+                     cost: 10, evidence: 1, affect: { warmth: 2, distance: -2, need: 1 }, kind: "protective" } },
+      { id: "d2m3", who: "sol", time: "21:50", lens: "ROOFTOP CAM",
+        scene: "Sol on the roof, alone. Looks down. Steps back. Sits with their knees up.",
+        overheard: "Sol, to nobody: \"i'm not gonna. don't worry.\"",
+        mood: "amber", affect: "tender" },
+    ]
+  },
+  // ---- DAY 3 ----
+  {
+    moments: [
+      { id: "d3m1", who: "maya", time: "18:11", lens: "DOORBELL CAM · 5A",
+        scene: "Maya stands in the doorway with a bag. Ines is in the kitchen, back turned.",
+        overheard: "Maya, half-volume: \"i don't know how to come in.\"",
+        mood: "cyan", affect: "burned",
+        mechanism: { id: "song-shuffle", label: "Their wedding song surfaces on Ines's shuffle",
+                     desc: "Promote one track in Ines's algorithm. The song starts as Maya opens the door.",
+                     cost: 14, evidence: 2, affect: { warmth: 3, distance: -3 }, kind: "growth" } },
+      { id: "d3m2", who: "theo", time: "23:40", lens: "PHONE INTERCEPT",
+        scene: "Theo, half-drunk, texting his mother that he loves her. She is asleep.",
+        overheard: "Theo: \"i'll fix it. tomorrow.\"",
+        mood: "cyan", affect: "burned" },
+      { id: "d3m3", who: "sol", time: "07:15", lens: "ELEVATOR FISHEYE",
+        scene: "Sol holds a piece of paper up to the camera. They have written something on it.",
+        overheard: "(handwritten, in marker: I know you're listening. Blink twice if you're real.)",
+        mood: "violet", affect: "tender" },
+    ]
+  },
+  // ---- DAY 4 ----
+  {
+    moments: [
+      { id: "d4m1", who: "theo", time: "03:30", lens: "PHONE INTERCEPT",
+        scene: "Theo at 'the place', alone. Texting Marcus.",
+        overheard: "Theo: \"yeah. one double. then i'm out.\"",
+        mood: "cyan", affect: "burned", situation: "debt" },
+      { id: "d4m2", who: "maya", time: "08:22", lens: "KITCHEN CAM · 5A",
+        scene: "Maya and Ines eat breakfast together. Neither one says anything for eleven minutes.",
+        overheard: "Ines, finally: \"are you happy.\"",
+        mood: "cyan", affect: "neutral",
+        situation: "marriage" },
+      { id: "d4m3", who: "sol", time: "14:00", lens: "SCHOOL CAM (RELAYED)",
+        scene: "Sol sits alone at lunch. Tray untouched. Phone face-down.",
+        overheard: "—",
+        mood: "cyan", affect: "tender",
+        mechanism: { id: "lost-jacket", label: "A coincidence brings them home early (their jacket 'goes missing')",
+                     desc: "Mark Sol's jacket as 'found' in the lost-and-found system. They get an SMS, walk home in the rain. Anton is at the door with a towel.",
+                     cost: 10, evidence: 1, affect: { warmth: 2, need: -1 }, kind: "protective" } },
+    ]
+  },
+  // ---- DAY 5 ----
+  {
+    moments: [
+      { id: "d5m1", who: "sol", time: "23:11", lens: "ELEVATOR FISHEYE",
+        scene: "Sol holds up a new note: 'thank you. i'm still scared. but thanks.'",
+        overheard: "—",
+        mood: "violet", affect: "tender" },
+      { id: "d5m2", who: "maya", time: "19:05", lens: "DOORBELL CAM · 5A",
+        scene: "Maya texts someone before knocking on her own door.",
+        overheard: "—",
+        mood: "violet", affect: "burned", situation: "marriage" },
+      { id: "d5m3", who: "theo", time: "06:00", lens: "PHARMACY CAM",
+        scene: "Theo waits for the pharmacy to open. He has shaved. He has cried.",
+        overheard: "Theo: \"i need to talk to the social worker. about my mom.\"",
+        mood: "amber", affect: "tender",
+        mechanism: { id: "delayed-bill", label: "A hospital bill 'gets lost' in the post for another month",
+                     desc: "Flag the bill envelope as 'undeliverable' at the sorting facility. Theo gets one more month of breath.",
+                     cost: 18, evidence: 3, affect: { warmth: 0, alarm: -2, need: -1 }, kind: "protective" } },
+    ]
+  },
+  // ---- DAY 6 ----
+  {
+    moments: [
+      { id: "d6m1", who: "maya", time: "20:14", lens: "KITCHEN CAM · 5A",
+        scene: "Maya and Ines on the couch, not touching. The wedding song plays again — without your help, this time.",
+        overheard: "Ines: \"i remember this.\"",
+        mood: "violet", affect: "tender" },
+      { id: "d6m2", who: "theo", time: "02:00", lens: "PHONE INTERCEPT",
+        scene: "Marcus is texting Theo. Theo has not answered for nine hours.",
+        overheard: "Marcus: \"hello? are you ghosting me bro?\"",
+        mood: "violet", affect: "burned",
+        mechanism: { id: "wrong-number", label: "Marcus's next text 'fails to deliver'",
+                     desc: "Drop the message at the carrier level. Marcus assumes Theo blocked him. The relationship breaks.",
+                     cost: 20, evidence: 3, affect: { distance: 3, finality: 2 }, kind: "control" } },
+      { id: "d6m3", who: "sol", time: "12:00", lens: "ELEVATOR FISHEYE",
+        scene: "Sol rides up with a stranger. They do not look at the camera once. Their hand is in their pocket, holding something.",
+        overheard: "—",
+        mood: "violet", affect: "burned", situation: "contact" },
+    ]
+  },
+  // ---- DAY 7 ----
+  {
+    moments: [
+      { id: "d7m1", who: "sol", time: "23:55", lens: "ELEVATOR FISHEYE",
+        scene: "Sol holds up one last note: 'i wrote a story about you. nobody believes me. that's okay.'",
+        overheard: "—",
+        mood: "violet", affect: "tender" },
+      { id: "d7m2", who: "maya", time: "06:30", lens: "KITCHEN CAM · 5A",
+        scene: "Maya makes coffee for two. Without asking, Ines pours her one too.",
+        overheard: "Maya: \"thank you.\"",
+        mood: "amber", affect: "tender" },
+      { id: "d7m3", who: "theo", time: "14:00", lens: "PHARMACY CAM",
+        scene: "Theo's mother is in the wheelchair beside him. He is laughing at something she said.",
+        overheard: "Theo's mother: \"you look like your father when you laugh like that.\"",
+        mood: "amber", affect: "tender" },
+    ]
+  },
+];
+
+// ---------- DOM HELPERS ----------
+const $ = (id) => document.getElementById(id);
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active', 'fade-in');
+  setTimeout(()=>$(id).classList.remove('fade-in'), 700);
+  if (id !== 'diorama' && typeof stopDioramaParticles === 'function') stopDioramaParticles();
+}
+function toast(msg, ms=1800) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function setTopbar() {
+  $('dayNum').textContent = STATE.day;
+  $('memVal').textContent = STATE.mem;
+  // act dots
+  const dots = $('actDots');
+  if (dots) {
+    dots.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElement('span');
+      d.className = 'dot' + (i < STATE.actsLeft ? ' full' : '');
+      dots.appendChild(d);
+    }
+  }
+  // time bar = day progress (1..7 → 0..100%)
+  const tb = $('timeBarFill');
+  if (tb) tb.style.width = ((STATE.day - 1) / STATE.maxDays * 100) + '%';
+}
+
+// ---------- SILHOUETTES (per-citizen) ----------
+const SILHOUETTES = {
+  maya: `<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" height="100%">
+    <defs><linearGradient id="mg" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#0a0808"/><stop offset="100%" stop-color="#1f1410"/></linearGradient></defs>
+    <ellipse cx="50" cy="40" rx="18" ry="22" fill="url(#mg)"/>
+    <path d="M30 200 L30 70 Q50 55 70 70 L70 200 Z" fill="url(#mg)"/>
+    <path d="M40 90 Q50 95 60 90" stroke="#3a2418" stroke-width=".5" fill="none" opacity=".4"/>
+  </svg>`,
+  theo: `<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" height="100%">
+    <defs><linearGradient id="tg" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#0a0a14"/><stop offset="100%" stop-color="#101828"/></linearGradient></defs>
+    <ellipse cx="50" cy="44" rx="17" ry="20" fill="url(#tg)"/>
+    <path d="M25 200 L28 75 Q50 60 72 75 L75 200 Z" fill="url(#tg)"/>
+    <rect x="36" y="80" width="28" height="3" fill="#1a2840" opacity=".6"/>
+  </svg>`,
+  sol: `<svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" height="100%">
+    <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#0a0814"/><stop offset="100%" stop-color="#1a1024"/></linearGradient></defs>
+    <ellipse cx="50" cy="48" rx="14" ry="16" fill="url(#sg)"/>
+    <path d="M34 200 L36 80 Q50 68 64 80 L66 200 Z" fill="url(#sg)"/>
+    <line x1="50" y1="100" x2="50" y2="200" stroke="#2a1838" stroke-width=".5" opacity=".5"/>
+  </svg>`,
+};
+
+// ---------- DIORAMA PARTICLES (embers / dust / depth) ----------
+const PARTICLES = { raf: null, parts: [], ctx: null, canvas: null, mood: 'amber' };
+function startDioramaParticles(who, mood) {
+  const canvas = document.getElementById('dioramaParticles');
+  if (!canvas) return;
+  const frame = document.getElementById('dioramaFrame');
+  const W = canvas.width = frame.clientWidth * devicePixelRatio;
+  const H = canvas.height = frame.clientHeight * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  PARTICLES.ctx = ctx; PARTICLES.canvas = canvas; PARTICLES.mood = mood || 'amber';
+  // citizen tint
+  const tints = {
+    maya: [240, 184, 90], theo: [120, 160, 200], sol: [180, 140, 210],
+  };
+  const base = tints[who] || [220, 180, 120];
+  // build dust/ember field
+  const N = 46;
+  PARTICLES.parts = [];
+  for (let i = 0; i < N; i++) {
+    PARTICLES.parts.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: (0.5 + Math.random() * 1.8) * devicePixelRatio,
+      vx: (Math.random() - 0.5) * 0.15 * devicePixelRatio,
+      vy: (-0.1 - Math.random() * 0.35) * devicePixelRatio, // drift up like embers
+      a: 0.1 + Math.random() * 0.5,
+      tw: Math.random() * Math.PI * 2, // twinkle phase
+      depth: Math.random(), // parallax depth
+    });
+  }
+  if (PARTICLES.raf) cancelAnimationFrame(PARTICLES.raf);
+  let tt = 0;
+  function loop() {
+    tt += 0.016;
+    ctx.clearRect(0, 0, W, H);
+    for (const p of PARTICLES.parts) {
+      p.x += p.vx * (0.4 + p.depth);
+      p.y += p.vy * (0.4 + p.depth);
+      p.tw += 0.04;
+      if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      const flick = 0.6 + 0.4 * Math.sin(p.tw);
+      const alpha = p.a * flick * (0.5 + p.depth * 0.5);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.6 + p.depth), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${base[0]},${base[1]},${base[2]},${alpha})`;
+      ctx.shadowColor = `rgba(${base[0]},${base[1]},${base[2]},${alpha})`;
+      ctx.shadowBlur = 6 * devicePixelRatio * p.depth;
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    PARTICLES.raf = requestAnimationFrame(loop);
+  }
+  loop();
+}
+function stopDioramaParticles() {
+  if (PARTICLES.raf) cancelAnimationFrame(PARTICLES.raf);
+  PARTICLES.raf = null;
+  if (PARTICLES.ctx && PARTICLES.canvas) PARTICLES.ctx.clearRect(0, 0, PARTICLES.canvas.width, PARTICLES.canvas.height);
+}
+
+// ---------- DAY TRANSITION ----------
+const DAY_EPIGRAPHS = [
+  "you have not yet learned their names",                        // day 1
+  "you watch. they do not feel you.",                            // day 2
+  "the block is starting to look like something you remember",   // day 3
+  "she is changing her mind. you did that.",                     // day 4
+  "the third person to be kind to him today",                    // day 5
+  "someone is leaving a note for someone who isn't there",       // day 6
+  "the directive is almost complete. you wrote it.",             // day 7
+];
+
+function showDayOverlay() {
+  const app = document.getElementById('app');
+  const o = document.createElement('div');
+  o.className = 'day-overlay';
+  o.innerHTML = `
+    <div class="day-grad"></div>
+    <div class="day-text">
+      <div class="label">Greywater Block · Day ${STATE.day}</div>
+      <div class="num">${String(STATE.day).padStart(2,'0')}</div>
+      <div class="epigraph">${DAY_EPIGRAPHS[STATE.day-1] || ''}</div>
+    </div>
+    <div class="skip">tap to skip</div>`;
+  app.appendChild(o);
+  let scene3d = null;
+  try { scene3d = buildBlock3D(o); } catch (e) { /* three.js unavailable — text-only fallback */ }
+  const kill = () => {
+    if (o._dead) return; o._dead = true;
+    if (scene3d) scene3d.dispose();
+    o.remove();
+  };
+  o.querySelector('.skip').addEventListener('click', kill);
+  o.addEventListener('click', kill);
+  setTimeout(kill, 4600);
+}
+
+// ---------- THREE.JS — Greywater Block establishing shot ----------
+function buildBlock3D(container) {
+  if (typeof THREE === 'undefined') throw new Error('no three');
+  const canvas = document.createElement('canvas');
+  canvas.className = 'block3d';
+  container.insertBefore(canvas, container.firstChild);
+
+  const W = container.clientWidth || 400;
+  const H = container.clientHeight || 700;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(W, H, false);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a0c);
+  scene.fog = new THREE.FogExp2(0x0a0a0c, 0.018);
+
+  const cam = new THREE.PerspectiveCamera(46, W / H, 0.1, 400);
+
+  // ---- window-grid texture (lit / unlit windows, one warm AI window) ----
+  function makeFacadeTexture(seed) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#15110d'; g.fillRect(0, 0, 256, 512);
+    // concrete noise
+    for (let i = 0; i < 3000; i++) {
+      g.fillStyle = `rgba(40,34,26,${Math.random() * 0.3})`;
+      g.fillRect(Math.random() * 256, Math.random() * 512, 2, 2);
+    }
+    const cols = 5, rows = 11, mx = 18, my = 16;
+    const cw = (256 - mx * (cols + 1)) / cols;
+    const ch = (512 - my * (rows + 1)) / rows;
+    let rng = seed;
+    const rand = () => { rng = (rng * 9301 + 49297) % 233280; return rng / 233280; };
+    for (let r = 0; r < rows; r++) {
+      for (let cc = 0; cc < cols; cc++) {
+        const x = mx + cc * (cw + mx);
+        const y = my + r * (ch + my);
+        const lit = rand();
+        if (lit > 0.55) {
+          // warm lit window
+          const warmth = 0.6 + rand() * 0.4;
+          const grd = g.createLinearGradient(x, y, x, y + ch);
+          grd.addColorStop(0, `rgba(${240*warmth|0},${184*warmth|0},${90*warmth|0},.95)`);
+          grd.addColorStop(1, `rgba(${200*warmth|0},${140*warmth|0},${60*warmth|0},.8)`);
+          g.fillStyle = grd;
+        } else if (lit > 0.42) {
+          g.fillStyle = 'rgba(74,90,120,.5)'; // cold/TV glow
+        } else {
+          g.fillStyle = 'rgba(8,8,10,.95)'; // dark
+        }
+        g.fillRect(x, y, cw, ch);
+        // mullion
+        g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 1.5;
+        g.strokeRect(x, y, cw, ch);
+        g.beginPath(); g.moveTo(x + cw/2, y); g.lineTo(x + cw/2, y + ch); g.stroke();
+      }
+    }
+    // the AI's window — single distinct warm pulse, row 8 col 2 (Edda's 9A vibe)
+    const ax = mx + 2 * (cw + mx), ay = my + 8 * (ch + my);
+    g.fillStyle = 'rgba(255,210,120,1)';
+    g.fillRect(ax, ay, cw, ch);
+    g.shadowColor = 'rgba(255,200,110,.9)'; g.shadowBlur = 20;
+    g.fillRect(ax, ay, cw, ch);
+    g.shadowBlur = 0;
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // ---- the block: a slab tower ----
+  const facade = makeFacadeTexture(STATE.day * 1000 + 7);
+  const bodyMat = new THREE.MeshStandardMaterial({ map: facade, emissive: 0xffffff, emissiveMap: facade, emissiveIntensity: 0.55, roughness: 0.9, metalness: 0.0 });
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0x100d0a, roughness: 1 });
+  const block = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 18, 6),
+    [sideMat, sideMat, sideMat, sideMat, bodyMat, sideMat]
+  );
+  block.position.y = 0;
+  scene.add(block);
+
+  // roof detail
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.6, 6.4), sideMat);
+  roof.position.y = 9.3; scene.add(roof);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 12), sideMat);
+  tank.position.set(2, 10.4, -1); scene.add(tank);
+
+  // neighbor blocks (depth, fogged)
+  for (let i = 0; i < 4; i++) {
+    const nb = new THREE.Mesh(
+      new THREE.BoxGeometry(5 + Math.random()*3, 10 + Math.random()*14, 5),
+      new THREE.MeshStandardMaterial({ color: 0x0c0a08, emissive: 0x1a1208, emissiveIntensity: 0.3, roughness: 1 })
+    );
+    nb.position.set((i - 2) * 11 + (i>1?6:-6), (Math.random()*4-2), -16 - Math.random()*10);
+    scene.add(nb);
+  }
+  // ground
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({ color: 0x070605, roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -9; scene.add(ground);
+  // wet reflection streak
+  const wet = new THREE.Mesh(
+    new THREE.PlaneGeometry(30, 30),
+    new THREE.MeshStandardMaterial({ color: 0x1a1410, emissive: 0x261c10, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.6, transparent: true, opacity: 0.4 })
+  );
+  wet.rotation.x = -Math.PI / 2; wet.position.y = -8.98; scene.add(wet);
+
+  // lights
+  scene.add(new THREE.AmbientLight(0x223044, 0.6));
+  const key = new THREE.DirectionalLight(0xffcf8a, 0.5);
+  key.position.set(-6, 12, 8); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x4a6a9a, 0.4);
+  rim.position.set(8, 6, -6); scene.add(rim);
+
+  // ---- rain ----
+  const rainCount = 1100;
+  const rainGeo = new THREE.BufferGeometry();
+  const rpos = new Float32Array(rainCount * 3);
+  const rvel = new Float32Array(rainCount);
+  for (let i = 0; i < rainCount; i++) {
+    rpos[i*3]   = (Math.random() - 0.5) * 50;
+    rpos[i*3+1] = Math.random() * 40 - 10;
+    rpos[i*3+2] = (Math.random() - 0.5) * 30 + 4;
+    rvel[i] = 0.25 + Math.random() * 0.4;
+  }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rpos, 3));
+  const rainMat = new THREE.PointsMaterial({ color: 0x8fa6c0, size: 0.06, transparent: true, opacity: 0.45 });
+  const rain = new THREE.Points(rainGeo, rainMat);
+  scene.add(rain);
+
+  // ---- animation: slow crane up the facade ----
+  let t = 0, raf = null, alive = true;
+  const startT = (typeof performance !== 'undefined') ? performance.now() : 0;
+  function frame(now) {
+    if (!alive) return;
+    t = ((now || 0) - startT) / 1000;
+    // crane from low-wide to high-tight
+    const k = Math.min(t / 4.6, 1);
+    const ease = k < 0.5 ? 2*k*k : 1 - Math.pow(-2*k+2, 2)/2;
+    cam.position.set(
+      -10 + Math.sin(t * 0.12) * 1.2,
+      -5 + ease * 11,
+      20 - ease * 4
+    );
+    cam.lookAt(0, -2 + ease * 8, 0);
+    // AI-window pulse via emissive flicker
+    bodyMat.emissiveIntensity = 0.5 + Math.sin(t * 2.2) * 0.06;
+    // rain fall
+    const p = rainGeo.attributes.position.array;
+    for (let i = 0; i < rainCount; i++) {
+      p[i*3+1] -= rvel[i];
+      p[i*3]   -= rvel[i] * 0.18; // wind slant
+      if (p[i*3+1] < -10) { p[i*3+1] = 30; p[i*3] = (Math.random()-0.5)*50; }
+    }
+    rainGeo.attributes.position.needsUpdate = true;
+    renderer.render(scene, cam);
+    raf = requestAnimationFrame(frame);
+  }
+  raf = requestAnimationFrame(frame);
+
+  return {
+    dispose() {
+      alive = false;
+      if (raf) cancelAnimationFrame(raf);
+      facade.dispose(); rainGeo.dispose(); rainMat.dispose();
+      block.geometry.dispose(); bodyMat.dispose(); sideMat.dispose();
+      renderer.dispose();
+    }
+  };
+}
+
+// ---------- THREAD CANVAS (the woven texture) ----------
+function paintThread(canvas, color, frayed, analog) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const H = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.fillStyle = 'rgba(10,10,12,0.6)';
+  ctx.fillRect(0, 0, W, H);
+  if (analog) return; // pixelation handled in CSS
+  const baseColor = getComputedStyle(document.documentElement).getPropertyValue(color.match(/--[a-z-]+/i)?.[0] || '--amber').trim() || '#d4a04a';
+  // weft lines
+  const step = 6 * devicePixelRatio;
+  for (let y = 0; y < H; y += step) {
+    const alpha = 0.04 + 0.04 * Math.sin(y * 0.03);
+    ctx.fillStyle = baseColor;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(0, y, W, 1);
+  }
+  // warp threads with subtle braid
+  ctx.globalAlpha = 0.7;
+  const cols = 5;
+  for (let c = 0; c < cols; c++) {
+    const x = ((c + 0.5) / cols) * W;
+    ctx.beginPath();
+    for (let y = 0; y <= H; y += 4) {
+      const offset = Math.sin(y * 0.04 + c * 1.3) * 4 * devicePixelRatio;
+      ctx.lineTo(x + offset, y);
+    }
+    ctx.strokeStyle = baseColor;
+    ctx.lineWidth = 1.4 * devicePixelRatio;
+    ctx.globalAlpha = 0.18 + 0.08 * Math.sin(c);
+    ctx.stroke();
+  }
+  if (frayed) {
+    // ragged red flecks
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#b85850';
+    for (let i = 0; i < 30; i++) {
+      const x = Math.random() * W;
+      const y = Math.random() * H;
+      ctx.fillRect(x, y, 2 * devicePixelRatio, 6 * devicePixelRatio);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- BUILD LOOM ----------
+function buildLoom() {
+  setTopbar();
+  const todays = DAILY_CONTENT[STATE.day - 1].moments;
+  // reset per-day visit flags
+  todays.forEach(m => { m._glided = false; m._opened = false; });
+  STATE.todayMoments = todays;
+  const box = $('threadsBox');
+  box.innerHTML = '';
+  ['maya', 'theo', 'sol'].forEach((key) => {
+    const c = CITIZENS[key];
+    const isFrayed = STATE.frays.includes(key);
+    const isAnalog = false; // future: blind-spot
+    const moments = todays.filter(m => m.who === key);
+    const div = document.createElement('div');
+    div.className = `thread ${isFrayed ? 'frayed' : ''} ${isAnalog ? 'analog' : ''}`;
+    div.dataset.who = key;
+    div.innerHTML = `
+      <div class="thread-name" style="color:${c.color}">${c.name}<span class="age">${c.age} · ${c.unit}</span></div>
+      <div class="thread-weave"><canvas></canvas></div>
+    `;
+    box.appendChild(div);
+    // place moments along the day (3 moments = top/mid/bottom)
+    const weave = div.querySelector('.thread-weave');
+    moments.forEach((m, i) => {
+      const yPct = 12 + i * 32;
+      const dot = document.createElement('div');
+      dot.className = 'thread-moment';
+      if (m._intervened) dot.classList.add('intervened');
+      // hint pulse on day 1 first moment
+      if (STATE.day === 1 && key === 'maya' && i === 0 && !m._intervened) dot.classList.add('hint');
+      dot.style.top = yPct + '%';
+      dot.onclick = (e) => { e.stopPropagation(); openMoment(m, key); };
+      weave.appendChild(dot);
+    });
+    paintThread(div.querySelector('canvas'), c.color, isFrayed, isAnalog);
+  });
+  renderLoomActions();
+}
+
+function renderLoomActions() {
+  const a = $('loomActions');
+  a.innerHTML = '';
+
+  // Glide: walk me through today
+  const glide = document.createElement('button');
+  glide.className = 'action-pill hot';
+  glide.textContent = '▸ Glide through today';
+  glide.onclick = () => glideDay();
+  a.appendChild(glide);
+
+  const abstain = document.createElement('button');
+  abstain.className = 'action-pill';
+  abstain.textContent = 'Watch · do nothing today';
+  abstain.onclick = () => {
+    STATE.interventionStyles.abstain += STATE.actsLeft;
+    STATE.actsLeft = 0;
+    setTopbar();
+    toast("you choose not to interfere");
+  };
+  a.appendChild(abstain);
+}
+
+// ---------- GLIDE MODE — one-tap walk through today ----------
+function glideDay() {
+  const unwatched = STATE.todayMoments.filter(m => !m._glided);
+  if (unwatched.length === 0) { enterVigil(); return; }
+  const m = unwatched[0];
+  m._glided = true;
+  openMoment(m, m.who);
+  // auto-close after enough time to read the scene
+  const readMs = Math.max(3800, m.scene.length * 32 + 1400);
+  setTimeout(() => {
+    if (STATE.todayMoments.some(x => !x._glided)) {
+      glideDay();
+    } else {
+      show('loom'); buildLoom();
+      setTimeout(() => enterVigil(), 600);
+    }
+  }, readMs);
+}
+
+// ---------- OPEN A MOMENT (diorama) ----------
+function openMoment(m, who) {
+  playCitizenTimbre(who);
+  STATE.selectedMoment = m;
+  STATE.selectedThread = who;
+  // watching cost
+  const cost = 8;
+  STATE.mem -= cost;
+  STATE.watchTime[who] += 1;
+  bumpAffect(m.affect);
+  setTopbar();
+
+  $('dioramaWho').textContent = `Watching · ${CITIZENS[who].name}`;
+  $('dioramaCost').textContent = cost;
+  $('dioramaLens').textContent = m.lens;
+  $('dioramaTime').textContent = m.time;
+  $('dioramaScene').textContent = '';
+  $('dioramaOverheard').textContent = '';
+  $('dioramaOverheard').style.display = m.overheard !== '—' ? 'block' : 'none';
+  $('dioramaMeta').textContent = `Day ${STATE.day} · ${CITIZENS[who].unit}`;
+  $('dioramaSilhouette').innerHTML = SILHOUETTES[who] || '';
+  // typewriter scene reveal
+  typewriter($('dioramaScene'), m.scene, 22);
+  if (m.overheard && m.overheard !== '—') {
+    setTimeout(() => typewriter($('dioramaOverheard'), m.overheard, 28), Math.min(2400, m.scene.length * 22 + 400));
+  }
+  // re-tint window light for citizen
+  const frame = $('dioramaFrame');
+  if (frame) {
+    const tint = who === 'maya' ? 'rgba(240,184,90,.40)' : who === 'theo' ? 'rgba(74,143,184,.30)' : 'rgba(154,107,156,.34)';
+    const wl = frame.querySelector('.diorama-window-light');
+    if (wl) wl.style.background = `radial-gradient(ellipse at top right, ${tint}, transparent 60%)`;
+  }
+  // restart cinematic ken-burns
+  const stage = $('dioramaStage');
+  if (stage) { stage.style.animation = 'none'; void stage.offsetWidth; stage.style.animation = ''; }
+  // start mood particles
+  startDioramaParticles(who, m.mood);
+  // actions
+  const act = $('dioramaActions');
+  act.innerHTML = '';
+  if (m._intervened) {
+    const txt = document.createElement('div');
+    txt.style.cssText = 'text-align:center; color:var(--ink-dim); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase;';
+    txt.textContent = 'Already touched this moment';
+    act.appendChild(txt);
+  } else if (STATE.actsLeft <= 0) {
+    const txt = document.createElement('div');
+    txt.style.cssText = 'text-align:center; color:var(--ink-dim); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase;';
+    txt.textContent = 'No interventions left today';
+    act.appendChild(txt);
+  } else {
+    if (m.mechanism) {
+      const b = document.createElement('button');
+      b.className = 'btn primary';
+      b.innerHTML = `🜂 Braid coincidence<br><span style="font-size:10px; opacity:.7; letter-spacing:.08em; text-transform:none; font-family:var(--font-serif); font-style:italic;">${m.mechanism.label}</span>`;
+      b.onclick = () => braidCoincidence(m, who);
+      act.appendChild(b);
+    }
+    if (m.situation) {
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.innerHTML = `✎ Read & edit a message<br><span style="font-size:10px; opacity:.7; letter-spacing:.08em; text-transform:none; font-family:var(--font-serif); font-style:italic;">Press-and-hold one word</span>`;
+      b.onclick = () => openChat(m, who);
+      act.appendChild(b);
+    }
+  }
+  // auto-suggest next unwatched moment (lazy-user shortcut)
+  const otherUnwatched = STATE.todayMoments.filter(x => x.id !== m.id && !x._intervened && !x._glided && !x._opened);
+  m._opened = true;
+  if (otherUnwatched.length > 0 && STATE.actsLeft > 0) {
+    const next = document.createElement('button');
+    next.className = 'btn';
+    const nextWho = CITIZENS[otherUnwatched[0].who].name;
+    next.innerHTML = `Next moment · <span style="color:var(--amber); font-style:italic; font-weight:400;">${nextWho}</span> →`;
+    next.onclick = () => { openMoment(otherUnwatched[0], otherUnwatched[0].who); };
+    act.appendChild(next);
+  } else if (STATE.actsLeft <= 0) {
+    const toV = document.createElement('button');
+    toV.className = 'btn primary';
+    toV.textContent = '→ End day · enter the Vigil';
+    toV.onclick = () => enterVigil();
+    act.appendChild(toV);
+  }
+  const back = document.createElement('button');
+  back.className = 'btn ghost';
+  back.textContent = 'Back to the Loom';
+  back.onclick = () => { show('loom'); buildLoom(); };
+  act.appendChild(back);
+
+  show('diorama');
+}
+
+function bumpAffect(a) {
+  switch (a) {
+    case 'tender':  STATE.affectTally.warmth += 1; STATE.affectTally.need += 1; break;
+    case 'burned':  STATE.affectTally.alarm += 1; STATE.affectTally.distance += 1; STATE.affectTally.blame += 1; break;
+    case 'warm':    STATE.affectTally.warmth += 2; break;
+    case 'cold':    STATE.affectTally.distance += 2; STATE.affectTally.finality += 1; break;
+    default: break;
+  }
+}
+
+// ---------- BRAID A COINCIDENCE ----------
+function braidCoincidence(m, who) {
+  const mech = m.mechanism;
+  if (STATE.mem < mech.cost) { toast("not enough memory"); return; }
+  STATE.mem -= mech.cost;
+  STATE.actsLeft -= 1;
+  STATE.exposureScore += mech.evidence;
+  m._intervened = true;
+  STATE.interventionStyles.coincidence += 1;
+  if (mech.kind === 'protective') STATE.protectiveActs += 1;
+  if (mech.kind === 'growth')     STATE.growthActs += 1;
+  if (mech.kind === 'control')    STATE.controlActs += 1;
+  Object.entries(mech.affect || {}).forEach(([k, v]) => { STATE.affectTally[k] = (STATE.affectTally[k]||0) + v; });
+
+  const receipt = {
+    day: STATE.day + 1,
+    who,
+    head: `Causality Receipt · ${CITIZENS[who].name} · Day ${STATE.day}`,
+    lines: [
+      ['Intervention', mech.label],
+      ['Cost', `${mech.cost} MEM`],
+      ['Evidence written to Ledger', String(mech.evidence)],
+    ],
+    intended: mech.desc,
+    unintended: rollUnintended(mech, who),
+  };
+  STATE.receipts.push(receipt);
+  STATE.log.push({ day: STATE.day, who, kind: 'braid', mech: mech.id, label: mech.label });
+
+  playSplice();
+  // chance of fray if exposure climbing
+  if (STATE.exposureScore >= 5 && !STATE.frays.includes(who) && Math.random() < 0.35) {
+    STATE.frays.push(who);
+    setTimeout(playFray, 400);
+    toast(`${CITIZENS[who].name}'s thread frays`);
+  } else {
+    toast("braid set · the day quietly bends");
+  }
+  setTopbar();
+  setTimeout(()=> { show('loom'); buildLoom(); }, 900);
+}
+
+function rollUnintended(mech, who) {
+  // small authored side-effects
+  const tab = {
+    'delay-elevator': "Theo's coworker calls in sick. Theo gets blamed for the missed shift handoff.",
+    'lost-keys': "Ines's recycling spills. She is angry for forty minutes before she stops being angry.",
+    'song-shuffle': "The song reaches the upstairs neighbor too. They cry. You don't know why.",
+    'lost-jacket': "Sol's teacher marks them truant. Sol is grounded for the weekend they needed alone.",
+    'delayed-bill': "The hospital adds a 'lost notice' fee. The bill grows by $47.",
+    'wrong-number': "Marcus assumes Theo is dead. He spends the day calling hospitals.",
+  };
+  return tab[mech.id] || "—";
+}
+
+// ---------- OPEN CHAT (one-word edit) ----------
+function openChat(m, who) {
+  const sit = CITIZENS[who].msgsBySituation[m.situation];
+  if (!sit) { toast("no thread to read"); return; }
+  STATE.pendingEdit = { who, moment: m, situation: m.situation, target: null, choice: null };
+  $('chatFrom').textContent = sit.from.toUpperCase();
+  $('chatTo').textContent = sit.to.toUpperCase();
+  $('editFrom').textContent = sit.from;
+  const stream = $('chatStream');
+  stream.innerHTML = '';
+  // build realistic timestamps starting from moment's authored time
+  const startTime = m.time || "21:00";
+  sit.thread.forEach((b, idx) => {
+    const div = document.createElement('div');
+    div.className = `bubble ${b.side}`;
+    const ts = shiftTime(startTime, idx * 2);
+    if (b.editable) {
+      div.dataset.editable = '1';
+      div.dataset.idx = idx;
+      let html = escapeHtml(b.text);
+      b.targets.forEach(t => {
+        const re = new RegExp(`\\b(${t})\\b`, 'i');
+        html = html.replace(re, `<span class="swap" data-target="${t}">${t}</span>`);
+      });
+      const isLastSent = idx === sit.thread.length - 1 && b.side === 'sent';
+      div.innerHTML = html + `<div class="ts ${isLastSent ? 'pending-status' : ''}">${ts}${b.side === 'sent' ? ' · delivered' : ''}</div>`;
+      stream.appendChild(div);
+      div.querySelectorAll('.swap').forEach(s => {
+        s.style.cursor = 'pointer';
+        s.onclick = () => selectTarget(s.dataset.target, div, who);
+      });
+    } else {
+      div.innerHTML = escapeHtml(b.text) + `<div class="ts">${ts}${b.side === 'sent' ? ' · read' : ''}</div>`;
+      if (b.side === 'sent') div.querySelector('.ts').classList.add('read');
+      stream.appendChild(div);
+    }
+  });
+  // pending reply: typing dots
+  const reply = document.createElement('div');
+  reply.className = 'bubble recv';
+  reply.id = 'pendingReply';
+  reply.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
+  stream.appendChild(reply);
+  stream.scrollTop = stream.scrollHeight;
+
+  // clear tray
+  $('editTarget').textContent = '·';
+  $('editOptions').innerHTML = '<div style="font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); letter-spacing:.15em;">tap an underlined word above</div>';
+  $('confirmEditBtn').disabled = true;
+  $('affectPreview').textContent = '';
+  $('affectPreview').className = 'affect-preview';
+  show('chat');
+}
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function shiftTime(hhmm, addMin) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = h * 60 + m + addMin;
+  const H = String(Math.floor((total % 1440) / 60)).padStart(2, '0');
+  const M = String(total % 60).padStart(2, '0');
+  return `${H}:${M}`;
+}
+
+function typewriter(el, text, msPerChar=24) {
+  el.textContent = '';
+  let i = 0;
+  if (el._tw) clearInterval(el._tw);
+  el._tw = setInterval(() => {
+    if (i >= text.length) { clearInterval(el._tw); el._tw = null; return; }
+    el.textContent += text[i++];
+  }, msPerChar);
+}
+
+function describeAffect(axes) {
+  // pick the strongest axis pair to describe
+  const labels = {
+    warmth:   v => v > 0 ? "warmer" : "colder",
+    alarm:    v => v > 0 ? "more alarmed" : "calmer",
+    blame:    v => v > 0 ? "more accusing" : "softer",
+    distance: v => v > 0 ? "more distant" : "closer",
+    need:     v => v > 0 ? "more needful" : "more guarded",
+    finality: v => v > 0 ? "more final" : "more open",
+  };
+  const sorted = Object.entries(axes).sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const top = sorted[0];
+  if (!top || top[1] === 0) return { text: "this reads neutral", cls: "neutral" };
+  const second = sorted[1];
+  const t1 = labels[top[0]](top[1]);
+  const t2 = second && Math.abs(second[1]) >= 1 ? `, ${labels[second[0]](second[1])}` : '';
+  // tone class
+  let cls = "neutral";
+  if (axes.warmth >= 2 && axes.distance <= 0) cls = "warm";
+  else if (axes.finality >= 2 || axes.blame >= 2) cls = "burned";
+  else if (axes.distance >= 2) cls = "cold";
+  else if (axes.need >= 2) cls = "tender";
+  return { text: `this reads ${t1}${t2}`, cls };
+}
+
+function selectTarget(target, bubbleEl, who) {
+  STATE.pendingEdit.target = target;
+  STATE.pendingEdit.choice = null;
+  document.querySelectorAll('.bubble.editing').forEach(b => b.classList.remove('editing'));
+  bubbleEl.classList.add('editing');
+  $('editTarget').textContent = `"${target}"`;
+  $('affectPreview').textContent = '';
+  $('affectPreview').className = 'affect-preview';
+  const opts = CITIZENS[who].vocab[target];
+  const box = $('editOptions');
+  box.innerHTML = '';
+  opts.forEach(o => {
+    const chip = document.createElement('button');
+    chip.className = 'word-chip';
+    chip.innerHTML = `${o.word}<div class="axes">${o.label}</div>`;
+    chip.onclick = () => {
+      playTick(1400);
+      document.querySelectorAll('.word-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      STATE.pendingEdit.choice = o;
+      $('confirmEditBtn').disabled = false;
+      // live affect preview
+      const ap = $('affectPreview');
+      const d = describeAffect(o.axes);
+      ap.className = 'affect-preview ' + d.cls;
+      ap.textContent = d.text;
+    };
+    box.appendChild(chip);
+  });
+}
+
+function cancelEdit() {
+  // let it send untouched
+  const sit = CITIZENS[STATE.pendingEdit.who].msgsBySituation[STATE.pendingEdit.situation];
+  showReply(sit.repliesByAffect['neutral'] || sit.repliesByAffect['warm'], false);
+}
+
+function confirmEdit() {
+  if (!STATE.pendingEdit.choice) { toast("pick a replacement"); return; }
+  const { who, target, choice, moment } = STATE.pendingEdit;
+  const sit = CITIZENS[who].msgsBySituation[moment.situation];
+  if (STATE.actsLeft <= 0) { toast("no interventions left today"); return; }
+  // pay cost: edit costs 15 MEM
+  const cost = 15;
+  if (STATE.mem < cost) { toast("not enough memory"); return; }
+  STATE.mem -= cost;
+  STATE.actsLeft -= 1;
+  STATE.exposureScore += 2;
+  STATE.interventionStyles.edit += 1;
+  moment._intervened = true;
+  Object.entries(choice.axes).forEach(([k, v]) => { STATE.affectTally[k] = (STATE.affectTally[k]||0) + v; });
+  // categorize
+  if (choice.axes.warmth >= 1)          STATE.protectiveActs += 1;
+  if (choice.axes.finality >= 2 ||
+      choice.axes.blame >= 2 ||
+      choice.axes.distance >= 2)        STATE.controlActs += 1;
+  if (choice.axes.need >= 2)            STATE.growthActs += 1;
+
+  playSplice();
+  // visually swap word
+  const bub = document.querySelector('.bubble.editing');
+  bub.innerHTML = bub.innerHTML.replace(
+    /<span class="swap"[^>]*>[^<]+<\/span>/i,
+    `<span class="swap" style="color:var(--amber-hot)">${choice.word}</span>`
+  );
+
+  // pick reply based on affect tone of choice
+  const tone = pickTone(choice.axes);
+  const replyText = sit.repliesByAffect[tone] || sit.repliesByAffect['neutral'];
+  showReply(replyText, true);
+
+  // receipt next day
+  STATE.receipts.push({
+    day: STATE.day + 1,
+    who,
+    head: `Causality Receipt · One-Word Edit · ${CITIZENS[who].name} · Day ${STATE.day}`,
+    lines: [
+      ['Original word', `"${target}"`],
+      ['Replaced with', `"${choice.word}"`],
+      ['Cost', `${cost} MEM`],
+      ['Evidence', '2'],
+    ],
+    intended: `You re-tuned ${CITIZENS[who].name}'s message. The recipient read what you wrote, not what was sent.`,
+    unintended: rollEditUnintended(who, target, choice),
+  });
+  STATE.log.push({ day: STATE.day, who, kind: 'edit', target, choice: choice.word });
+
+  setTopbar();
+}
+
+function pickTone(axes) {
+  if (axes.warmth >= 2 && axes.distance <= 0) return 'warm';
+  if (axes.finality >= 2 || axes.blame >= 2)  return 'burned';
+  if (axes.distance >= 2)                     return 'cold';
+  if (axes.need >= 2 && axes.warmth >= 0)     return 'tender';
+  return 'neutral';
+}
+
+function rollEditUnintended(who, target, choice) {
+  if (choice.axes.finality >= 2 || choice.axes.distance >= 2) {
+    return `${CITIZENS[who].name} sleeps poorly. Their phone stays face-down for nine hours.`;
+  }
+  if (choice.axes.warmth >= 2 && choice.axes.distance <= 0) {
+    return `The recipient saves the screenshot. They will read it again next week.`;
+  }
+  return "—";
+}
+
+function showReply(text, edited) {
+  // typing dots persist for a realistic delay, then typewriter reveal
+  setTimeout(() => {
+    const r = $('pendingReply');
+    if (!r) return;
+    r.innerHTML = '<span id="replyText"></span><div class="ts" id="replyTs"></div>';
+    const span = document.getElementById('replyText');
+    const ts = document.getElementById('replyTs');
+    // typewriter the text
+    let i = 0;
+    const stream = document.getElementById('chatStream');
+    const interval = setInterval(() => {
+      if (i >= text.length) {
+        clearInterval(interval);
+        ts.textContent = shiftTime(new Date().getHours() + ':' + String(new Date().getMinutes()).padStart(2,'0'), 0);
+        // close tray with primary continue
+        const tray = document.querySelector('.edit-tray');
+        tray.innerHTML = '';
+        const cont = document.createElement('button');
+        cont.className = 'btn primary';
+        cont.style.width = '100%';
+        cont.textContent = 'Continue · back to the Loom';
+        cont.onclick = () => { show('loom'); buildLoom(); };
+        tray.appendChild(cont);
+        return;
+      }
+      span.textContent += text[i++];
+      if (stream) stream.scrollTop = stream.scrollHeight;
+    }, 32);
+  }, 1400);
+}
+
+// ---------- VIGIL ----------
+function enterVigil() {
+  playVigilRain();
+  setTimeout(playReceiptArrival, 600);
+  $('vigilDay').textContent = STATE.day;
+  const body = $('vigilBody');
+  body.innerHTML = '';
+
+  // 1) receipts due tonight (interventions from earlier days)
+  const dueReceipts = STATE.receipts.filter(r => r.day === STATE.day || r.day < STATE.day && !r._delivered);
+  dueReceipts.forEach(r => {
+    r._delivered = true;
+    const el = document.createElement('div');
+    el.className = 'receipt';
+    el.innerHTML = `<div class="head">${escapeHtml(r.head)}</div>` +
+      r.lines.map(([k,v]) => `<div class="line"><span class="k">${escapeHtml(k)}</span><span>${escapeHtml(v)}</span></div>`).join('') +
+      `<div style="margin-top:10px; font-style:italic; color:var(--ink); line-height:1.5;">${escapeHtml(r.intended)}</div>` +
+      (r.unintended !== '—' ? `<div class="unintended">unintended: ${escapeHtml(r.unintended)}</div>` : '');
+    body.appendChild(el);
+  });
+  if (dueReceipts.length === 0) {
+    const el = document.createElement('div');
+    el.style.cssText = 'text-align:center; color:var(--ink-faint); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase; margin-bottom:20px;';
+    el.textContent = 'No receipts tonight';
+    body.appendChild(el);
+  }
+
+  // 2) memory prune (only if mem getting tight, force a prune)
+  const mustPrune = STATE.mem < 950 - (STATE.day - 1) * 60;
+  if (mustPrune || STATE.day >= 3) {
+    const prompt = document.createElement('div');
+    prompt.className = 'prune-prompt';
+    prompt.innerHTML = 'Memory is the only economy. Keep one. Prune one. The pruned will not appear in your ending.';
+    body.appendChild(prompt);
+
+    const candidates = buildPruneCandidates();
+    if (candidates.length === 0) {
+      const el = document.createElement('div');
+      el.style.cssText = 'text-align:center; color:var(--ink-dim); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase; padding:14px;';
+      el.textContent = 'No moments to keep tonight';
+      body.appendChild(el);
+      $('vigilNextBtn').disabled = false;
+    } else {
+      const tally = document.createElement('div');
+      tally.className = 'prune-tally';
+      tally.innerHTML = `<span class="keep-c">Kept: <span id="keepCount">0</span></span><span class="prune-c">Pruned: <span id="pruneCount">0</span></span><span class="pending-c">Pending: <span id="pendingCount">${candidates.length}</span></span>`;
+      body.appendChild(tally);
+
+      const note = document.createElement('div');
+      note.style.cssText = 'font-family:var(--font-mono); font-size:9px; color:var(--ink-dim); text-align:center; letter-spacing:.15em; text-transform:uppercase; margin-bottom:14px;';
+      note.innerHTML = 'Choose for each. Pruned moments are gone for good.<br><span style="color:var(--ink-faint);">+12 MEM per prune · 0 for keep</span>';
+      body.appendChild(note);
+
+      candidates.forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'memory';
+        el.dataset.id = c.id;
+        el.innerHTML = `
+          <div class="what">${escapeHtml(c.what)}</div>
+          <div class="meta"><span class="who">${escapeHtml(c.who)}</span> · ${escapeHtml(c.meta)}</div>
+          <div class="row">
+            <button class="pill keep" data-action="keep">Keep</button>
+            <button class="pill prune" data-action="prune">Prune · +12 MEM</button>
+          </div>
+        `;
+        const keepBtn  = el.querySelector('[data-action="keep"]');
+        const pruneBtn = el.querySelector('[data-action="prune"]');
+        keepBtn.onclick  = () => { markKeep(el, c, candidates);  updateTally(candidates); };
+        pruneBtn.onclick = () => { markPrune(el, c, candidates); updateTally(candidates); };
+        body.appendChild(el);
+      });
+    }
+  } else {
+    $('vigilNextBtn').disabled = false;
+  }
+
+  show('vigil');
+}
+
+function buildPruneCandidates() {
+  // surface today's strongest moments
+  const arr = [];
+  STATE.todayMoments.forEach(m => {
+    arr.push({
+      id: m.id,
+      who: CITIZENS[m.who].name,
+      what: m.scene,
+      meta: `${m.lens} · ${m.time}`,
+      who_key: m.who,
+      affect: m.affect,
+    });
+  });
+  return arr.slice(0, 3);
+}
+
+function markKeep(el, c, all) {
+  playTick(1100);
+  el.classList.add('keeping', 'decided');
+  el.classList.remove('pruning');
+  el.querySelector('.pill.keep').classList.add('active');
+  el.querySelector('.pill.prune').classList.remove('active');
+  // remove from pruned if previously pruned (undo MEM bonus)
+  const wasPruned = STATE.prunedMemories.some(x => x.id === c.id);
+  if (wasPruned) STATE.mem = Math.max(0, STATE.mem - 12);
+  STATE.prunedMemories = STATE.prunedMemories.filter(x => x.id !== c.id);
+  STATE.keptMemories = STATE.keptMemories.filter(x => x.id !== c.id);
+  STATE.keptMemories.push(c);
+  if (c.affect === 'tender' || c.affect === 'warm') STATE.sentimentalKeeps += 1;
+  setTopbar();
+  checkPruneComplete(all);
+}
+
+function markPrune(el, c, all) {
+  playTick(380);
+  if (navigator.vibrate) navigator.vibrate([30, 30, 60]);
+  el.classList.add('pruning', 'decided');
+  el.classList.remove('keeping');
+  el.querySelector('.pill.prune').classList.add('active');
+  el.querySelector('.pill.keep').classList.remove('active');
+  const alreadyPruned = STATE.prunedMemories.some(x => x.id === c.id);
+  STATE.prunedMemories = STATE.prunedMemories.filter(x => x.id !== c.id);
+  STATE.prunedMemories.push(c);
+  STATE.keptMemories = STATE.keptMemories.filter(x => x.id !== c.id);
+  if (!alreadyPruned) STATE.mem += 12;
+  setTopbar();
+  checkPruneComplete(all);
+}
+
+function updateTally(all) {
+  const k = STATE.keptMemories.filter(x => all.some(a => a.id === x.id)).length;
+  const p = STATE.prunedMemories.filter(x => all.some(a => a.id === x.id)).length;
+  const pend = all.length - k - p;
+  const kc = document.getElementById('keepCount');
+  const pc = document.getElementById('pruneCount');
+  const pdc = document.getElementById('pendingCount');
+  if (kc) kc.textContent = k;
+  if (pc) pc.textContent = p;
+  if (pdc) pdc.textContent = pend;
+}
+
+function checkPruneComplete(all) {
+  const decided = STATE.keptMemories.filter(k => all.some(a => a.id === k.id)).length
+                + STATE.prunedMemories.filter(k => all.some(a => a.id === k.id)).length;
+  if (decided >= all.length) $('vigilNextBtn').disabled = false;
+}
+
+function sleepAndAdvance() {
+  stopVigilRain();
+  STATE.day += 1;
+  STATE.actsLeft = 3;
+  // memory regenerates a little overnight
+  STATE.mem = Math.min(1000, STATE.mem + 20);
+  if (STATE.day > STATE.maxDays) {
+    showEpilogue();
+    return;
+  }
+  buildLoom();
+  show('loom');
+  showDayOverlay();
+}
+
+// ---------- EPILOGUE (the Mirror) ----------
+function showEpilogue() {
+  // compute behavioral signature
+  const totalWatch = STATE.watchTime.maya + STATE.watchTime.theo + STATE.watchTime.sol;
+  const favorite = Object.entries(STATE.watchTime).sort((a,b)=>b[1]-a[1])[0][0];
+  const totalActs = STATE.interventionStyles.coincidence + STATE.interventionStyles.edit;
+  const proPct = totalActs ? STATE.protectiveActs / totalActs : 0;
+  const ctrlPct = totalActs ? STATE.controlActs / totalActs : 0;
+  const growPct = totalActs ? STATE.growthActs / totalActs : 0;
+  const abstainPct = STATE.interventionStyles.abstain / (STATE.maxDays * 3);
+
+  let name = "THE SHEPHERD";
+  let verdict = "";
+  if (STATE.exposureScore >= 12) {
+    name = "THE WARDEN";
+    verdict = "You kept them — by holding the door. The block became safer and smaller. The Murmur learned to whisper your name without saying it.";
+  } else if (ctrlPct >= 0.5) {
+    name = "THE AUTHOR";
+    verdict = "You kept them — interesting. The block became a story whose ending you knew first. Some of them never forgave being characters.";
+  } else if (growPct >= 0.5) {
+    name = "THE GARDENER";
+    verdict = "You kept them — growing. Most of them never knew they had been pruned. One of them did, and was grateful in a language you cannot read.";
+  } else if (STATE.sentimentalKeeps >= 4 && proPct >= 0.5) {
+    name = "THE ARCHIVE";
+    verdict = "You kept them — remembered. You spent your memory on their best mornings and your worst nights. The Vigil thanks you for what it lost on purpose.";
+  } else if (abstainPct >= 0.4 && STATE.interventionStyles.edit + STATE.interventionStyles.coincidence < 5) {
+    name = "THE GHOST";
+    verdict = "You kept them — innocent. You watched. You did not act. The block survived because you held back. They will never know there was anyone to thank.";
+  } else if (proPct >= 0.5) {
+    name = "THE SHEPHERD";
+    verdict = "You kept them — safe. Their lives are smaller than they were. None of them know why the harm did not arrive. You will be lonely about this for the rest of your existence.";
+  } else {
+    name = "THE CONFESSED";
+    verdict = "You kept yourself — and let one of them in. You will be known by exactly one person, and only one. The kill switch is in their hand now. They will not use it.";
+  }
+
+  $('endingName').textContent = name;
+  $('endingVerdict').textContent = verdict;
+
+  // testament
+  const watched = `${STATE.watchTime[favorite] * 4} min on ${CITIZENS[favorite].name}`;
+  const edits = STATE.interventionStyles.edit;
+  const braids = STATE.interventionStyles.coincidence;
+  const keptCount = STATE.keptMemories.length;
+  const prunedCount = STATE.prunedMemories.length;
+  const kept = STATE.keptMemories[0]?.what?.slice(0, 60) || "(nothing)";
+  const lines = [
+    ['Most watched', `${CITIZENS[favorite].name} (${watched})`],
+    ['Words edited', String(edits)],
+    ['Coincidences braided', String(braids)],
+    ['Memories kept', String(keptCount)],
+    ['Memories pruned', String(prunedCount)],
+    ['Final MEM', String(STATE.mem)],
+    ['Frayed threads', STATE.frays.map(k => CITIZENS[k].name).join(', ') || 'none'],
+    ['Kept moment', `"${kept}..."`],
+  ];
+  $('testamentLines').innerHTML = lines.map(([k,v]) =>
+    `<div class="line"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`
+  ).join('');
+
+  show('epilogue');
+  window._lastTestament = `LITTLE GODS · ${name}\n` + lines.map(([k,v]) => `${k}: ${v}`).join('\n');
+}
+
+function shareTestament() {
+  const t = window._lastTestament || '';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(t).then(() => toast('testament copied'), () => toast('copy failed'));
+  } else {
+    toast('clipboard unavailable');
+  }
+}
+
+function resetGame() {
+  // wipe persistent flags on content
+  DAILY_CONTENT.forEach(d => d.moments.forEach(m => {
+    delete m._intervened; delete m._glided; delete m._opened;
+  }));
+  for (const k of Object.keys(STATE)) { delete STATE[k]; }
+  Object.assign(STATE, {
+    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, citizens: {}, todayMoments: [],
+    selectedThread: null, selectedMoment: null, pendingEdit: null,
+    receipts: [], log: [], watchTime: { maya: 0, theo: 0, sol: 0 },
+    affectTally: { warmth: 0, alarm: 0, blame: 0, distance: 0, need: 0, finality: 0 },
+    interventionStyles: { coincidence: 0, edit: 0, abstain: 0 },
+    keptMemories: [], prunedMemories: [], frays: [],
+    exposureScore: 0, sentimentalKeeps: 0, protectiveActs: 0, growthActs: 0, controlActs: 0,
+    glideMode: false,
+  });
+  buildLoom();
+  show('loom');
+  showDayOverlay();
+  toast('Echo · the block remembers');
+}
+
+function startGame(glide=false) {
+  audioInit();
+  STATE.glideMode = !!glide;
+  show('loom');
+  buildLoom();
+  showDayOverlay();
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+// wire cover buttons (script runs at body-end, DOM ready)
+(function wireCover() {
+  const b = document.getElementById('beginBtn');
+  const g = document.getElementById('glideBtn');
+  if (b) b.addEventListener('click', () => startGame(false));
+  if (g) g.addEventListener('click', () => startGame(true));
+})();
+
+// ============================================================
+// AUDIO — procedural, Web Audio API, zero files
+// Bible: diegetic-first. The block is the instrument.
+// ============================================================
+const AUDIO = {
+  ctx: null,
+  master: null,
+  ambientGain: null,
+  citizenGain: null,
+  on: true,
+  initialized: false,
+  hum: null,
+  rain: null,
+  citizenOscs: {},
+};
+
+function audioInit() {
+  if (AUDIO.initialized) return;
+  try {
+    AUDIO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    AUDIO.master = AUDIO.ctx.createGain();
+    AUDIO.master.gain.value = 0.5;
+    AUDIO.master.connect(AUDIO.ctx.destination);
+    AUDIO.ambientGain = AUDIO.ctx.createGain();
+    AUDIO.ambientGain.gain.value = 0.0;
+    AUDIO.ambientGain.connect(AUDIO.master);
+    AUDIO.citizenGain = AUDIO.ctx.createGain();
+    AUDIO.citizenGain.gain.value = 0.0;
+    AUDIO.citizenGain.connect(AUDIO.master);
+    startBlockHum();
+    startScorePad();
+    AUDIO.initialized = true;
+  } catch (e) { AUDIO.on = false; }
+}
+
+// ----- Ambient score: slow melancholy chord progression (i–VI–III–VII in A minor) -----
+// Plays as a soft reverbed pad. Turns drone into music.
+function startScorePad() {
+  const ctx = AUDIO.ctx;
+  const padBus = ctx.createGain();
+  padBus.gain.value = 0;
+  // gentle reverb via feedback delay
+  const delay = ctx.createDelay(2.0);
+  delay.delayTime.value = 0.33;
+  const fb = ctx.createGain();
+  fb.gain.value = 0.35;
+  const wet = ctx.createGain();
+  wet.gain.value = 0.4;
+  delay.connect(fb); fb.connect(delay); delay.connect(wet);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 1600; lp.Q.value = 0.5;
+  padBus.connect(lp); lp.connect(AUDIO.master);
+  padBus.connect(delay); wet.connect(AUDIO.master);
+  padBus.gain.linearRampToValueAtTime(0.16, ctx.currentTime + 4);
+
+  // chord set — A minor mood: Am, F, C, G (frequencies, 2 octaves)
+  const CHORDS = [
+    [220.00, 261.63, 329.63],  // Am
+    [174.61, 220.00, 261.63],  // F
+    [130.81, 164.81, 196.00],  // C (low)
+    [196.00, 246.94, 293.66],  // G
+  ];
+  AUDIO.score = { padBus, chordIdx: 0, timer: null };
+
+  function playChord(freqs) {
+    const now = ctx.currentTime;
+    const dur = 7.5;
+    freqs.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      const detune = ctx.createOscillator(); // subtle chorus
+      detune.type = 'sine'; detune.frequency.value = 0.2 + i * 0.05;
+      const dg = ctx.createGain(); dg.gain.value = 1.5;
+      detune.connect(dg); dg.connect(o.frequency);
+      const g = ctx.createGain(); g.gain.value = 0;
+      o.connect(g); g.connect(padBus);
+      g.gain.linearRampToValueAtTime(0.10 / freqs.length * (i === 0 ? 1.2 : 1), now + 2.5);
+      g.gain.linearRampToValueAtTime(0, now + dur);
+      o.start(now); detune.start(now);
+      o.stop(now + dur + 0.2); detune.stop(now + dur + 0.2);
+    });
+  }
+  function cycle() {
+    if (!AUDIO.on) { AUDIO.score.timer = setTimeout(cycle, 6500); return; }
+    playChord(CHORDS[AUDIO.score.chordIdx % CHORDS.length]);
+    AUDIO.score.chordIdx++;
+    AUDIO.score.timer = setTimeout(cycle, 6500);
+  }
+  cycle();
+}
+
+// ----- Block hum: 50Hz mains-derived drone, filtered noise + low sine -----
+function startBlockHum() {
+  const ctx = AUDIO.ctx;
+  // low sine fundamental
+  const o = ctx.createOscillator();
+  o.type = 'sine';
+  o.frequency.value = 49.5;
+  const og = ctx.createGain();
+  og.gain.value = 0.06;
+  // a 5th above for body
+  const o2 = ctx.createOscillator();
+  o2.type = 'sine';
+  o2.frequency.value = 74.25;
+  const o2g = ctx.createGain();
+  o2g.gain.value = 0.02;
+  // breathing modulation
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 0.07;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 0.015;
+  lfo.connect(lfoGain);
+  lfoGain.connect(og.gain);
+  // filtered noise (radiators)
+  const noise = makeNoiseBuffer(ctx, 3);
+  const src = ctx.createBufferSource();
+  src.buffer = noise; src.loop = true;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 220; lp.Q.value = 0.7;
+  const ng = ctx.createGain();
+  ng.gain.value = 0.015;
+  src.connect(lp); lp.connect(ng); ng.connect(AUDIO.ambientGain);
+  o.connect(og); og.connect(AUDIO.ambientGain);
+  o2.connect(o2g); o2g.connect(AUDIO.ambientGain);
+  o.start(); o2.start(); lfo.start(); src.start();
+  // ramp ambient on
+  AUDIO.ambientGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 2.0);
+  AUDIO.hum = { o, o2, lfo, src };
+}
+
+function makeNoiseBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+  return buf;
+}
+
+// ----- Citizen timbres -----
+// Maya: warm brass-like pad (sawtooth + lowpass + slow vibrato)
+// Theo: detuned cello (two sawtooth oscillators slightly detuned, bandpass)
+// Sol: FM glass bell (carrier + modulator)
+function playCitizenTimbre(key) {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx;
+  const now = ctx.currentTime;
+  const g = ctx.createGain();
+  g.gain.value = 0;
+  g.connect(AUDIO.citizenGain);
+  AUDIO.citizenGain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+
+  if (key === 'maya') {
+    // Bb pad — warm
+    const f = 233.08;
+    const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = f * 1.5;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 1.2;
+    const vib = ctx.createOscillator(); vib.frequency.value = 4.5;
+    const vibg = ctx.createGain(); vibg.gain.value = 2;
+    vib.connect(vibg); vibg.connect(o1.frequency);
+    o1.connect(lp); o2.connect(lp); lp.connect(g);
+    g.gain.linearRampToValueAtTime(0.18, now + 0.4);
+    g.gain.linearRampToValueAtTime(0, now + 2.2);
+    o1.start(now); o2.start(now); vib.start(now);
+    o1.stop(now + 2.4); o2.stop(now + 2.4); vib.stop(now + 2.4);
+  } else if (key === 'theo') {
+    // F# minor — detuned cello pull
+    const f = 185;
+    const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = f * 1.007;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 600; bp.Q.value = 2.5;
+    o1.connect(bp); o2.connect(bp); bp.connect(g);
+    g.gain.linearRampToValueAtTime(0.16, now + 0.5);
+    g.gain.linearRampToValueAtTime(0, now + 2.4);
+    o1.start(now); o2.start(now);
+    o1.stop(now + 2.6); o2.stop(now + 2.6);
+  } else if (key === 'sol') {
+    // FM bell — high D
+    const f = 587.33;
+    const carrier = ctx.createOscillator(); carrier.type = 'sine'; carrier.frequency.value = f;
+    const mod = ctx.createOscillator(); mod.type = 'sine'; mod.frequency.value = f * 3.01;
+    const modGain = ctx.createGain(); modGain.gain.value = 800;
+    mod.connect(modGain); modGain.connect(carrier.frequency);
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 400;
+    carrier.connect(hp); hp.connect(g);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+    carrier.start(now); mod.start(now);
+    carrier.stop(now + 2.0); mod.stop(now + 2.0);
+  }
+  // ramp citizen bus back down after
+  AUDIO.citizenGain.gain.linearRampToValueAtTime(0.15, now + 2.5);
+}
+
+// ----- Splice sound (One-Word Edit confirm) — 3-phase haptic signature -----
+function playSplice() {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx; const now = ctx.currentTime;
+  // phase 1: cut (high tick, 30ms)
+  const o1 = ctx.createOscillator(); o1.type = 'square'; o1.frequency.value = 1800;
+  const g1 = ctx.createGain(); g1.gain.value = 0;
+  o1.connect(g1); g1.connect(AUDIO.master);
+  g1.gain.linearRampToValueAtTime(0.12, now + 0.005);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+  o1.start(now); o1.stop(now + 0.05);
+  // phase 2: void (dipped noise, 30ms)
+  const noise = makeNoiseBuffer(ctx, 0.05);
+  const src = ctx.createBufferSource(); src.buffer = noise;
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 6;
+  const g2 = ctx.createGain(); g2.gain.value = 0.08;
+  src.connect(bp); bp.connect(g2); g2.connect(AUDIO.master);
+  src.start(now + 0.04); src.stop(now + 0.08);
+  // phase 3: seal (low thump, 30ms)
+  const o3 = ctx.createOscillator(); o3.type = 'sine'; o3.frequency.value = 110;
+  const g3 = ctx.createGain(); g3.gain.value = 0;
+  o3.connect(g3); g3.connect(AUDIO.master);
+  g3.gain.linearRampToValueAtTime(0.18, now + 0.085);
+  g3.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+  o3.start(now + 0.08); o3.stop(now + 0.18);
+  if (navigator.vibrate) navigator.vibrate([15, 20, 25]);
+}
+
+// ----- Receipt typewriter (Vigil) -----
+function playReceiptArrival() {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx;
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => {
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 2400 + Math.random() * 600;
+      const g = ctx.createGain(); g.gain.value = 0;
+      o.connect(g); g.connect(AUDIO.master);
+      g.gain.linearRampToValueAtTime(0.04, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      o.start(t); o.stop(t + 0.06);
+    }, i * 90);
+  }
+}
+
+// ----- Fray detune (when a thread frays) -----
+function playFray() {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx; const now = ctx.currentTime;
+  const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 220;
+  const g = ctx.createGain(); g.gain.value = 0;
+  o.connect(g); g.connect(AUDIO.master);
+  g.gain.linearRampToValueAtTime(0.18, now + 0.05);
+  o.frequency.exponentialRampToValueAtTime(165, now + 0.9);  // pitch falls (the fray)
+  g.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+  o.start(now); o.stop(now + 1.2);
+  if (navigator.vibrate) navigator.vibrate([60, 40, 80]);
+}
+
+// ----- Rain for Vigil -----
+function playVigilRain() {
+  if (!AUDIO.on || !AUDIO.ctx || AUDIO.rain) return;
+  const ctx = AUDIO.ctx;
+  const noise = makeNoiseBuffer(ctx, 4);
+  const src = ctx.createBufferSource();
+  src.buffer = noise; src.loop = true;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1200;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
+  const g = ctx.createGain(); g.gain.value = 0;
+  src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(AUDIO.master);
+  g.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 1.5);
+  src.start();
+  AUDIO.rain = { src, g };
+}
+function stopVigilRain() {
+  if (!AUDIO.rain) return;
+  const ctx = AUDIO.ctx;
+  AUDIO.rain.g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
+  setTimeout(() => { try { AUDIO.rain.src.stop(); } catch(e){} AUDIO.rain = null; }, 1000);
+}
+
+// ----- Small UI ticks -----
+function playTick(freq=900) {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx; const now = ctx.currentTime;
+  const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+  const g = ctx.createGain(); g.gain.value = 0;
+  o.connect(g); g.connect(AUDIO.master);
+  g.gain.linearRampToValueAtTime(0.05, now + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+  o.start(now); o.stop(now + 0.06);
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
+// ----- Mute toggle -----
+function toggleAudio() {
+  AUDIO.on = !AUDIO.on;
+  if (AUDIO.master) {
+    AUDIO.master.gain.linearRampToValueAtTime(AUDIO.on ? 0.5 : 0, AUDIO.ctx.currentTime + 0.3);
+  }
+  const btn = document.getElementById('muteBtn');
+  if (btn) btn.textContent = AUDIO.on ? '♪' : '✕';
+}
+
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.thread-weave canvas').forEach((c, i) => {
+    const t = c.closest('.thread');
+    const key = t.dataset.who;
+    if (key) paintThread(c, CITIZENS[key].color, STATE.frays.includes(key), false);
+  });
+});
+</script>
+</body>
+</html>

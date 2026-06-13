@@ -1,0 +1,29 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / tooling
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local
+.claude/settings.local.json
+
+# Node (future tooling / Bubblewrap)
+node_modules/
+*.log
+npm-debug.log*
+
+# Android build artifacts (future)
+*.keystore
+*.jks
+*.aab
+*.apk
+android/
+build/
+dist/
+
+# Temp
+/tmp/
+*.tmp
