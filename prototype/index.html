@@ -204,6 +204,57 @@ html, body {
 
 /* ---------- LOOM ---------- */
 #loom { background: var(--bg); }
+.loom-hub {
+  flex: 1;
+  position: relative;
+  margin: 4px 12px 8px;
+  border-radius: 3px;
+  overflow: hidden;
+  min-height: 0;
+}
+.loom-hub canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hub-labels { position: absolute; inset: 0; pointer-events: none; }
+.hub-label {
+  position: absolute;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: opacity .3s;
+}
+.hub-label .hl-name {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 1px 6px #000, 0 0 3px #000;
+}
+.hub-label .hl-status {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-top: 1px;
+  text-shadow: 0 1px 6px #000;
+}
+.hub-label.touched .hl-name { opacity: .4; }
+.hub-hint {
+  position: absolute;
+  bottom: 8px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
 .loom-header {
   padding: 4px 18px 12px;
   font-family: var(--font-mono);
@@ -1114,9 +1165,13 @@ html, body {
       <div class="mem">MEM <span class="num" id="memVal">1000</span></div>
     </div>
   </div>
-  <div class="loom-header">The Loom · tap a glowing moment to open</div>
+  <div class="loom-header">Greywater Block · tap a lit window to look inside</div>
   <div class="time-bar"><div class="fill" id="timeBarFill"></div></div>
-  <div class="threads" id="threadsBox"></div>
+  <div class="loom-hub" id="loomHub">
+    <canvas id="loomCanvas"></canvas>
+    <div class="hub-labels" id="hubLabels"></div>
+  </div>
+  <div class="threads" id="threadsBox" style="display:none;"></div>
   <div style="text-align:center;">
     <div class="interventions-left">Interventions left: <span class="act-dots" id="actDots"></span></div>
   </div>
@@ -1586,6 +1641,17 @@ function show(id) {
   $(id).classList.add('active', 'fade-in');
   setTimeout(()=>$(id).classList.remove('fade-in'), 700);
   if (id !== 'diorama' && typeof stopDioramaParticles === 'function') stopDioramaParticles();
+  if (id !== 'loom' && typeof pauseLoomHub === 'function') pauseLoomHub();
+  if (id === 'loom' && LOOMHUB.inited) {
+    // loom just became visible — size the renderer to the now-laid-out host and resume
+    requestAnimationFrame(() => {
+      const host = LOOMHUB.host;
+      const W = host.clientWidth || 360, H = host.clientHeight || 480;
+      LOOMHUB.renderer.setSize(W, H, false);
+      LOOMHUB.cam.aspect = W / H; LOOMHUB.cam.updateProjectionMatrix();
+      if (!LOOMHUB.alive) { LOOMHUB.alive = true; if (!LOOMHUB.raf) hubLoop(); }
+    });
+  }
 }
 function toast(msg, ms=1800) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -1953,6 +2019,21 @@ function buildLoom() {
   setTopbar();
   const todays = getDayMoments();
   STATE.todayMoments = todays;
+  // Prefer the 3D building hub; fall back to the thread view if WebGL/THREE is unavailable.
+  let hubOk = false;
+  if (typeof THREE !== 'undefined') {
+    try { buildLoomHub(todays); hubOk = true; } catch (e) { hubOk = false; }
+  }
+  const hubEl = document.getElementById('loomHub');
+  const threadsEl = document.getElementById('threadsBox');
+  if (hubOk) { if (hubEl) hubEl.style.display = ''; if (threadsEl) threadsEl.style.display = 'none'; renderLoomActions(); return; }
+  if (hubEl) hubEl.style.display = 'none';
+  if (threadsEl) threadsEl.style.display = '';
+  buildThreads(todays);
+  renderLoomActions();
+}
+
+function buildThreads(todays) {
   const box = $('threadsBox');
   box.innerHTML = '';
   ['maya', 'theo', 'sol'].forEach((key) => {
@@ -1993,8 +2074,171 @@ function buildLoom() {
     weave.style.opacity = String(clamp(moodDim, 0.5, 1));
     paintThread(weave.querySelector('canvas'), `--${band==='crisis'?'red':band==='tense'?'amber':'amber'}`, isFrayed, isAnalog);
   });
-  renderLoomActions();
 }
+
+// ============================================================
+// LOOM HUB — the building IS the board. Windows light by mood;
+// tap a window to drop into that life.
+// ============================================================
+const LOOMHUB = { inited: false, raf: null, alive: false, windows: {}, t: 0 };
+const HUB_WIN_POS = { maya: [-2.2, 3.0], theo: [2.3, -1.0], sol: [0.1, -4.4] };
+
+function hubFacadeTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 448;
+  const g = c.getContext('2d');
+  g.fillStyle = '#14110d'; g.fillRect(0, 0, 256, 448);
+  for (let i = 0; i < 2200; i++) { g.fillStyle = `rgba(40,34,26,${Math.random()*0.3})`; g.fillRect(Math.random()*256, Math.random()*448, 2, 2); }
+  const cols = 6, rows = 9, mx = 14, my = 14;
+  const cw = (256 - mx*(cols+1))/cols, ch = (448 - my*(rows+1))/rows;
+  let rng = 12345; const rand = () => { rng = (rng*9301+49297)%233280; return rng/233280; };
+  for (let r=0;r<rows;r++) for (let cc=0;cc<cols;cc++) {
+    const x = mx+cc*(cw+mx), y = my+r*(ch+my), lit = rand();
+    g.fillStyle = lit>0.7 ? 'rgba(150,120,70,.30)' : lit>0.5 ? 'rgba(60,72,96,.25)' : 'rgba(8,8,10,.9)';
+    g.fillRect(x,y,cw,ch);
+    g.strokeStyle='rgba(0,0,0,.6)'; g.lineWidth=1.4; g.strokeRect(x,y,cw,ch);
+  }
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+
+function initLoomHub() {
+  const canvas = document.getElementById('loomCanvas');
+  const host = document.getElementById('loomHub');
+  const W = host.clientWidth || 360, H = host.clientHeight || 480;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(W, H, false);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a0c);
+  scene.fog = new THREE.FogExp2(0x0a0a0c, 0.022);
+  const cam = new THREE.PerspectiveCamera(44, W/H, 0.1, 200);
+  cam.position.set(0, 0.5, 16.5);
+  cam.lookAt(0, -0.5, 0);
+
+  // building
+  const facade = hubFacadeTexture();
+  const bodyMat = new THREE.MeshStandardMaterial({ map: facade, emissive: 0xffffff, emissiveMap: facade, emissiveIntensity: 0.4, roughness: 0.95 });
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0x0e0b08, roughness: 1 });
+  const block = new THREE.Mesh(new THREE.BoxGeometry(8.4, 15, 6), [sideMat,sideMat,sideMat,sideMat,bodyMat,sideMat]);
+  scene.add(block);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(8.8,0.6,6.4), sideMat); roof.position.y=7.8; scene.add(roof);
+  // neighbors + ground
+  for (let i=0;i<3;i++){ const nb=new THREE.Mesh(new THREE.BoxGeometry(5,12+Math.random()*8,5), new THREE.MeshStandardMaterial({color:0x0b0907,emissive:0x140e07,emissiveIntensity:0.25,roughness:1})); nb.position.set((i-1)*13+(i?5:-5),-1,-15); scene.add(nb); }
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x070605,roughness:1})); ground.rotation.x=-Math.PI/2; ground.position.y=-7.6; scene.add(ground);
+  scene.add(new THREE.AmbientLight(0x223044,0.65));
+  const key=new THREE.DirectionalLight(0xffcf8a,0.4); key.position.set(-6,10,8); scene.add(key);
+
+  // citizen windows
+  const windows = {};
+  ['maya','theo','sol'].forEach(who=>{
+    const [x,y]=HUB_WIN_POS[who];
+    const grp=new THREE.Group(); grp.position.set(x,y,3.02);
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.9,2.3), new THREE.MeshBasicMaterial({color:0x000000})); grp.add(frame);
+    const glass=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.9), new THREE.MeshBasicMaterial({color:0xd4a04a}));
+    glass.position.z=0.02; glass.userData.who=who; grp.add(glass);
+    // mullions
+    const mull=new THREE.Mesh(new THREE.PlaneGeometry(0.07,1.9), new THREE.MeshBasicMaterial({color:0x1a140c})); mull.position.z=0.03; grp.add(mull);
+    // soft halo behind
+    const halo=new THREE.Mesh(new THREE.PlaneGeometry(3.4,3.8), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    halo.position.z=-0.05; halo.raycast=function(){}; grp.add(halo);
+    scene.add(grp);
+    windows[who]={ grp, glass, halo, frame };
+  });
+
+  // rain
+  const N=700, rg=new THREE.BufferGeometry(), rp=new Float32Array(N*3), rv=new Float32Array(N);
+  for(let i=0;i<N;i++){ rp[i*3]=(Math.random()-0.5)*40; rp[i*3+1]=Math.random()*30-8; rp[i*3+2]=(Math.random()-0.5)*20+4; rv[i]=0.22+Math.random()*0.35; }
+  rg.setAttribute('position', new THREE.BufferAttribute(rp,3));
+  const rain=new THREE.Points(rg, new THREE.PointsMaterial({color:0x8fa6c0,size:0.05,transparent:true,opacity:0.4}));
+  scene.add(rain);
+
+  // tap handling
+  const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+  function onTap(ev){
+    const rect = canvas.getBoundingClientRect();
+    const px = (ev.touches? ev.touches[0].clientX : ev.clientX) - rect.left;
+    const py = (ev.touches? ev.touches[0].clientY : ev.clientY) - rect.top;
+    ndc.x = (px/rect.width)*2-1; ndc.y = -(py/rect.height)*2+1;
+    ray.setFromCamera(ndc, cam);
+    const hits = ray.intersectObjects(['maya','theo','sol'].map(w=>windows[w].glass));
+    if (hits.length) { const who = hits[0].object.userData.who; hubOpenCitizen(who); }
+  }
+  canvas.addEventListener('pointerdown', onTap);
+
+  LOOMHUB.renderer=renderer; LOOMHUB.scene=scene; LOOMHUB.cam=cam; LOOMHUB.windows=windows;
+  LOOMHUB.rain={geo:rg,vel:rv,n:N}; LOOMHUB.bodyMat=bodyMat; LOOMHUB.facade=facade; LOOMHUB.host=host; LOOMHUB.canvas=canvas;
+  LOOMHUB.inited=true;
+}
+
+function hubOpenCitizen(who){
+  const m = (STATE.todayMoments||[]).find(x=>x.who===who);
+  if (m) openMoment(m, who);
+}
+
+function buildLoomHub(todays){
+  if (!LOOMHUB.inited) initLoomHub();
+  // size to host (handles rotation/resizes)
+  const host = LOOMHUB.host;
+  const W = host.clientWidth||360, H = host.clientHeight||480;
+  LOOMHUB.renderer.setSize(W,H,false); LOOMHUB.cam.aspect=W/H; LOOMHUB.cam.updateProjectionMatrix();
+  // label container
+  const lab = document.getElementById('hubLabels'); lab.innerHTML='';
+  LOOMHUB.labels = {};
+  ['maya','theo','sol'].forEach(who=>{
+    const c=CITIZENS[who];
+    const el=document.createElement('div'); el.className='hub-label';
+    el.innerHTML=`<div class="hl-name" style="color:${c.color}">${c.name}</div><div class="hl-status"></div>`;
+    el.addEventListener('click', ()=>hubOpenCitizen(who));
+    lab.appendChild(el);
+    LOOMHUB.labels[who]=el;
+  });
+  const hint=document.createElement('div'); hint.className='hub-hint'; hint.textContent='tap a lit window'; lab.appendChild(hint);
+  LOOMHUB.alive=true;
+  if (!LOOMHUB.raf) hubLoop();
+}
+
+function hubLoop(){
+  if (!LOOMHUB.alive){ LOOMHUB.raf=null; return; }
+  LOOMHUB.t += 0.016;
+  const t=LOOMHUB.t;
+  // camera sway
+  LOOMHUB.cam.position.x = Math.sin(t*0.18)*0.5;
+  LOOMHUB.cam.position.y = 0.5 + Math.sin(t*0.13)*0.25;
+  LOOMHUB.cam.lookAt(0,-0.5,0);
+  // window glow by state
+  ['maya','theo','sol'].forEach(who=>{
+    const st=citizenState(who), band=bandFor(who), col=new THREE.Color(BAND_COLOR[band]||'#d4a04a');
+    const w=LOOMHUB.windows[who];
+    const touched = (STATE.todayMoments||[]).find(x=>x.who===who && x._intervened);
+    let glow, pulse;
+    if (band==='analog'){ glow=0.06; pulse=0; col.set('#2a2730'); }
+    else if (band==='crisis'){ pulse=0.5+0.5*Math.sin(t*7); glow=0.7+pulse*0.3; }
+    else if (band==='tense'){ pulse=0.5+0.5*Math.sin(t*2.2); glow=0.55+pulse*0.2; }
+    else if (band==='recovering'){ pulse=0.5+0.5*Math.sin(t*1.2); glow=0.6+pulse*0.15; }
+    else { pulse=0.5+0.5*Math.sin(t*0.8); glow=0.5+pulse*0.1; }
+    w.glass.material.color.copy(col).multiplyScalar(0.4+glow*0.8);
+    w.halo.material.color.copy(col);
+    w.halo.material.opacity = band==='analog'?0.0:(0.10+glow*0.22);
+    if (touched) { w.halo.material.opacity *= 0.5; }
+    // label position (project window top to screen)
+    const lbl=LOOMHUB.labels && LOOMHUB.labels[who];
+    if (lbl){
+      const v=new THREE.Vector3(HUB_WIN_POS[who][0], HUB_WIN_POS[who][1]+1.6, 3.05).project(LOOMHUB.cam);
+      const rect=LOOMHUB.canvas.getBoundingClientRect();
+      const sx=(v.x*0.5+0.5)*rect.width, sy=(-v.y*0.5+0.5)*rect.height;
+      lbl.style.left=sx+'px'; lbl.style.top=(sy-22)+'px';
+      lbl.classList.toggle('touched', !!touched);
+      const stt=lbl.querySelector('.hl-status'); stt.textContent=BAND_LABEL[band]; stt.style.color=BAND_COLOR[band];
+    }
+  });
+  // rain
+  const p=LOOMHUB.rain.geo.attributes.position.array;
+  for(let i=0;i<LOOMHUB.rain.n;i++){ p[i*3+1]-=LOOMHUB.rain.vel[i]; p[i*3]-=LOOMHUB.rain.vel[i]*0.16; if(p[i*3+1]<-8){p[i*3+1]=24;p[i*3]=(Math.random()-0.5)*40;} }
+  LOOMHUB.rain.geo.attributes.position.needsUpdate=true;
+  LOOMHUB.renderer.render(LOOMHUB.scene, LOOMHUB.cam);
+  LOOMHUB.raf=requestAnimationFrame(hubLoop);
+}
+
+function pauseLoomHub(){ LOOMHUB.alive=false; }
 
 function renderLoomActions() {
   const a = $('loomActions');
