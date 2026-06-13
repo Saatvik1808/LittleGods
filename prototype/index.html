@@ -710,6 +710,22 @@ html, body {
   z-index: 1;
 }
 /* cinematic ken-burns stage holding parallax layers */
+/* painted scene art — when a generated image exists for this citizen+mood it
+   fills the frame; otherwise this stays transparent and the procedural look shows */
+.diorama-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.1s ease;
+  transform-origin: 45% 40%;
+  animation: kenBurns 18s ease-out forwards;
+}
+.diorama-art.shown { opacity: 1; }
+.diorama-frame.has-art .diorama-stage { opacity: 0; }
+.diorama-frame.has-art .diorama-window-light { opacity: .4; }
 .diorama-stage {
   position: absolute;
   inset: -8%;
@@ -1250,6 +1266,7 @@ html, body {
     <div class="mem">−<span class="num" id="dioramaCost">8</span> MEM to watch</div>
   </div>
   <div class="diorama-frame" id="dioramaFrame">
+    <div class="diorama-art" id="dioramaArt"></div>
     <div class="diorama-stage" id="dioramaStage">
       <div class="diorama-window-light"></div>
       <div class="diorama-silhouette" id="dioramaSilhouette"></div>
@@ -1759,6 +1776,30 @@ const SILHOUETTES = {
   </svg>`,
 };
 
+// ---------- PAINTED SCENE ART ----------
+// Drop images into prototype/art/ and list them here. Key = "<who>_<band>"
+// (e.g. "maya_crisis") or just "<who>" as a fallback for any of that person's moments.
+// Missing keys fall back gracefully to the procedural diorama — no errors.
+const ART_MANIFEST = {
+  // "maya_tense": "maya_tense.jpg",
+  // "theo_crisis": "theo_crisis.jpg",
+  // "sol_calm": "sol_calm.jpg",
+};
+function setDioramaArt(who, band, override) {
+  const frame = document.getElementById('dioramaFrame');
+  const art = document.getElementById('dioramaArt');
+  if (!frame || !art) return;
+  const key = override || ART_MANIFEST[`${who}_${band}`] || ART_MANIFEST[who];
+  // reset
+  art.classList.remove('shown'); frame.classList.remove('has-art');
+  if (!key) { art.style.backgroundImage = ''; return; }
+  const src = 'art/' + key;
+  const img = new Image();
+  img.onload = () => { art.style.backgroundImage = `url("${src}")`; art.classList.add('shown'); frame.classList.add('has-art'); };
+  img.onerror = () => { art.style.backgroundImage = ''; }; // silently fall back
+  img.src = src;
+}
+
 // ---------- DIORAMA PARTICLES (embers / dust / depth) ----------
 const PARTICLES = { raf: null, parts: [], ctx: null, canvas: null, mood: 'amber' };
 function startDioramaParticles(who, mood) {
@@ -2162,6 +2203,36 @@ function hubFacadeTexture() {
   const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
 }
 
+// A soft person-silhouette texture for the lit windows (someone is home).
+function hubFigureTexture(pose) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 160;
+  const g = c.getContext('2d');
+  g.clearRect(0,0,128,160);
+  g.fillStyle = 'rgba(0,0,0,0.92)';
+  g.filter = 'blur(2px)';
+  if (pose === 'sit') {
+    // seated figure, lower
+    g.beginPath(); g.arc(64, 78, 15, 0, Math.PI*2); g.fill();              // head
+    g.beginPath(); g.moveTo(40,160); g.quadraticCurveTo(40,100,64,96); g.quadraticCurveTo(88,100,88,160); g.closePath(); g.fill(); // torso
+  } else {
+    // standing figure
+    g.beginPath(); g.arc(64, 44, 14, 0, Math.PI*2); g.fill();              // head
+    g.beginPath(); g.moveTo(46,160); g.quadraticCurveTo(44,70,64,60); g.quadraticCurveTo(84,70,82,160); g.closePath(); g.fill(); // body
+  }
+  g.filter = 'none';
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 2; return t;
+}
+
+// Sky gradient backdrop for day/night mood.
+function hubSkyTexture(top, bottom) {
+  const c = document.createElement('canvas'); c.width = 8; c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0, top); grd.addColorStop(1, bottom);
+  g.fillStyle = grd; g.fillRect(0,0,8,256);
+  const t = new THREE.CanvasTexture(c); return t;
+}
+
 function initLoomHub() {
   const canvas = document.getElementById('loomCanvas');
   const host = document.getElementById('loomHub');
@@ -2171,10 +2242,20 @@ function initLoomHub() {
   renderer.setSize(W, H, false);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0a0c);
-  scene.fog = new THREE.FogExp2(0x0a0a0c, 0.022);
+  scene.fog = new THREE.FogExp2(0x0a0a0c, 0.020);
   const cam = new THREE.PerspectiveCamera(44, W/H, 0.1, 200);
   cam.position.set(0, 0.5, 16.5);
   cam.lookAt(0, -0.5, 0);
+
+  // sky backdrop (graded by day/night each build)
+  const skyMat = new THREE.MeshBasicMaterial({ map: hubSkyTexture('#0a0a12','#0a0a0c'), depthWrite:false, fog:false });
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(120, 90), skyMat);
+  sky.position.set(0, 6, -34); scene.add(sky);
+  // faint stars
+  const starN=120, sg=new THREE.BufferGeometry(), sp=new Float32Array(starN*3);
+  for(let i=0;i<starN;i++){ sp[i*3]=(Math.random()-0.5)*90; sp[i*3+1]=8+Math.random()*30; sp[i*3+2]=-30; }
+  sg.setAttribute('position', new THREE.BufferAttribute(sp,3));
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({color:0x9aa6c0,size:0.12,transparent:true,opacity:0.5,fog:false})));
 
   // building
   const facade = hubFacadeTexture();
@@ -2186,24 +2267,30 @@ function initLoomHub() {
   // neighbors + ground
   for (let i=0;i<3;i++){ const nb=new THREE.Mesh(new THREE.BoxGeometry(5,12+Math.random()*8,5), new THREE.MeshStandardMaterial({color:0x0b0907,emissive:0x140e07,emissiveIntensity:0.25,roughness:1})); nb.position.set((i-1)*13+(i?5:-5),-1,-15); scene.add(nb); }
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x070605,roughness:1})); ground.rotation.x=-Math.PI/2; ground.position.y=-7.6; scene.add(ground);
-  scene.add(new THREE.AmbientLight(0x223044,0.65));
+  const amb=new THREE.AmbientLight(0x223044,0.65); scene.add(amb);
   const key=new THREE.DirectionalLight(0xffcf8a,0.4); key.position.set(-6,10,8); scene.add(key);
 
   // citizen windows
   const windows = {};
+  const poseByWho = { maya:'stand', theo:'sit', sol:'sit' };
   ['maya','theo','sol'].forEach(who=>{
     const [x,y]=HUB_WIN_POS[who];
     const grp=new THREE.Group(); grp.position.set(x,y,3.02);
     const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.9,2.3), new THREE.MeshBasicMaterial({color:0x000000})); grp.add(frame);
     const glass=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.9), new THREE.MeshBasicMaterial({color:0xd4a04a}));
     glass.position.z=0.02; glass.userData.who=who; grp.add(glass);
+    // the resident — a soft silhouette behind the lit glass
+    const figTex = hubFigureTexture(poseByWho[who]);
+    const figure = new THREE.Mesh(new THREE.PlaneGeometry(0.9,1.5),
+      new THREE.MeshBasicMaterial({ map:figTex, transparent:true, opacity:0.9, depthWrite:false }));
+    figure.position.set(0, -0.15, 0.03); figure.raycast=function(){}; grp.add(figure);
     // mullions
-    const mull=new THREE.Mesh(new THREE.PlaneGeometry(0.07,1.9), new THREE.MeshBasicMaterial({color:0x1a140c})); mull.position.z=0.03; grp.add(mull);
+    const mull=new THREE.Mesh(new THREE.PlaneGeometry(0.07,1.9), new THREE.MeshBasicMaterial({color:0x1a140c})); mull.position.z=0.04; grp.add(mull);
     // soft halo behind
     const halo=new THREE.Mesh(new THREE.PlaneGeometry(3.4,3.8), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
     halo.position.z=-0.05; halo.raycast=function(){}; grp.add(halo);
     scene.add(grp);
-    windows[who]={ grp, glass, halo, frame };
+    windows[who]={ grp, glass, halo, frame, figure, baseX: 0 };
   });
 
   // rain
@@ -2227,8 +2314,25 @@ function initLoomHub() {
   canvas.addEventListener('pointerdown', onTap);
 
   LOOMHUB.renderer=renderer; LOOMHUB.scene=scene; LOOMHUB.cam=cam; LOOMHUB.windows=windows;
-  LOOMHUB.rain={geo:rg,vel:rv,n:N}; LOOMHUB.bodyMat=bodyMat; LOOMHUB.facade=facade; LOOMHUB.host=host; LOOMHUB.canvas=canvas;
+  LOOMHUB.rain={geo:rg,vel:rv,n:N,mat:rain.material}; LOOMHUB.bodyMat=bodyMat; LOOMHUB.facade=facade; LOOMHUB.host=host; LOOMHUB.canvas=canvas;
+  LOOMHUB.sky=sky; LOOMHUB.skyMat=skyMat; LOOMHUB.amb=amb; LOOMHUB.key=key; LOOMHUB.fog=scene.fog;
   LOOMHUB.inited=true;
+}
+
+// Day/night colour grade — the block's sky shifts across the week (the colour script).
+function gradeLoomHub() {
+  if (!LOOMHUB.inited) return;
+  const d = STATE.day, max = STATE.maxDays;
+  // act colour: early amber-night -> forensic cyan -> bruised violet
+  let top, bot, fogC, ambC;
+  const phase = d / max;
+  if (phase < 0.4)      { top='#141018'; bot='#0c0a08'; fogC=0x0c0a08; ambC=0x2a2238; } // warm domestic night
+  else if (phase < 0.72){ top='#0a1018'; bot='#070a0c'; fogC=0x080c10; ambC=0x1e3040; } // forensic cyan
+  else                  { top='#120a18'; bot='#0a070c'; fogC=0x0c0810; ambC=0x2a1a38; } // bruised violet
+  LOOMHUB.skyMat.map = hubSkyTexture(top, bot); LOOMHUB.skyMat.needsUpdate = true;
+  LOOMHUB.fog.color.setHex(fogC);
+  LOOMHUB.scene.background.setHex(fogC);
+  LOOMHUB.amb.color.setHex(ambC);
 }
 
 function hubOpenCitizen(who){
@@ -2238,6 +2342,7 @@ function hubOpenCitizen(who){
 
 function buildLoomHub(todays){
   if (!LOOMHUB.inited) initLoomHub();
+  gradeLoomHub();   // day/night colour grade for this day
   // size to host (handles rotation/resizes)
   const host = LOOMHUB.host;
   const W = host.clientWidth||360, H = host.clientHeight||480;
@@ -2281,6 +2386,22 @@ function hubLoop(){
     w.halo.material.color.copy(col);
     w.halo.material.opacity = band==='analog'?0.0:(0.10+glow*0.22);
     if (touched) { w.halo.material.opacity *= 0.5; }
+    // the resident moves by their state: pacing when breaking, still when settled, gone when dark
+    if (w.figure){
+      if (band==='analog'){ w.figure.material.opacity = 0; }
+      else {
+        let amp, spd, vis;
+        if (band==='crisis'){ amp=0.32; spd=2.6; vis=0.95; }
+        else if (band==='tense'){ amp=0.16; spd=1.1; vis=0.9; }
+        else if (band==='recovering'){ amp=0.08; spd=0.7; vis=0.85; }
+        else { amp=0.05; spd=0.4; vis=0.8; }
+        const off = who.charCodeAt(0);
+        w.figure.position.x = Math.sin(t*spd + off)*amp;
+        w.figure.rotation.z = Math.sin(t*spd*0.7 + off)*amp*0.15;
+        // silhouette darker against a brighter (hotter) window
+        w.figure.material.opacity = vis;
+      }
+    }
     // label position (project window top to screen)
     const lbl=LOOMHUB.labels && LOOMHUB.labels[who];
     if (lbl){
@@ -2292,10 +2413,15 @@ function hubLoop(){
       const stt=lbl.querySelector('.hl-status'); stt.textContent=BAND_LABEL[band]; stt.style.color=BAND_COLOR[band];
     }
   });
-  // rain
-  const p=LOOMHUB.rain.geo.attributes.position.array;
-  for(let i=0;i<LOOMHUB.rain.n;i++){ p[i*3+1]-=LOOMHUB.rain.vel[i]; p[i*3]-=LOOMHUB.rain.vel[i]*0.16; if(p[i*3+1]<-8){p[i*3+1]=24;p[i*3]=(Math.random()-0.5)*40;} }
+  // weather responds to the block's distress: heavier, faster rain when the block is breaking
+  const avgCrisis = (citizenState('maya').crisis + citizenState('theo').crisis + citizenState('sol').crisis) / 3;
+  const storm = clamp(avgCrisis / 100, 0.15, 1);
+  if (LOOMHUB.rain.mat) LOOMHUB.rain.mat.opacity = 0.25 + storm * 0.45;
+  const p=LOOMHUB.rain.geo.attributes.position.array, sp = 0.7 + storm * 0.9;
+  for(let i=0;i<LOOMHUB.rain.n;i++){ p[i*3+1]-=LOOMHUB.rain.vel[i]*sp; p[i*3]-=LOOMHUB.rain.vel[i]*0.16*sp; if(p[i*3+1]<-8){p[i*3+1]=24;p[i*3]=(Math.random()-0.5)*40;} }
   LOOMHUB.rain.geo.attributes.position.needsUpdate=true;
+  // building windows breathe faintly
+  LOOMHUB.bodyMat.emissiveIntensity = 0.38 + Math.sin(t*0.5)*0.05;
   LOOMHUB.renderer.render(LOOMHUB.scene, LOOMHUB.cam);
   LOOMHUB.raf=requestAnimationFrame(hubLoop);
 }
@@ -2397,6 +2523,8 @@ function openMoment(m, who) {
   // restart cinematic ken-burns
   const stage = $('dioramaStage');
   if (stage) { stage.style.animation = 'none'; void stage.offsetWidth; stage.style.animation = ''; }
+  // painted scene art (if a generated image exists for this citizen+mood)
+  setDioramaArt(who, m.band, m.art);
   // start mood particles
   startDioramaParticles(who, m.mood);
   // actions
