@@ -75,6 +75,75 @@ html, body {
 .topbar .mem { color: var(--ink-dim); }
 .topbar .mem .num { color: var(--ink); }
 
+/* ---------- HEADER BUTTONS ---------- */
+.hdr-btn {
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  font-family: var(--font-mono);
+  transition: color .2s, opacity .2s;
+}
+.hdr-btn:hover, .hdr-btn:active { color: var(--amber); }
+.hdr-btn:disabled { opacity: .22; cursor: default; pointer-events: none; }
+
+/* ---------- LEDGER / CHECKPOINTS ---------- */
+.ledger-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 4px 18px 14px;
+  font-style: italic;
+}
+.ledger-body { flex: 1; overflow-y: auto; padding: 0 18px 28px; }
+.ledger-row {
+  border: 1px solid var(--ink-faint);
+  background: rgba(255,255,255,.02);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.ledger-row .lk { color: var(--ink-dim); letter-spacing: .1em; text-transform: uppercase; font-size: 9px; }
+.ledger-row .lv { color: var(--ink); text-align: right; }
+.ledger-row .lv .who { color: var(--amber); }
+.ledger-row.edit { border-left: 2px solid var(--cyan); }
+.ledger-row.braid { border-left: 2px solid var(--violet); }
+.ledger-row.empty { color: var(--ink-faint); text-align: center; border-style: dashed; }
+.ckpt-row {
+  border: 1px solid var(--ink-faint);
+  background: rgba(255,255,255,.02);
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.ckpt-row:hover { border-color: var(--amber); background: rgba(212,160,74,.06); }
+.ckpt-row .ck-day {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.ckpt-row .ck-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.ckpt-row .ck-meta .amber { color: var(--amber); }
+.ckpt-row.current { border-color: var(--amber); opacity: .55; cursor: default; }
+
 /* ---------- COVER ---------- */
 #cover {
   background: radial-gradient(ellipse at center, #1a1410 0%, var(--bg) 70%);
@@ -984,9 +1053,13 @@ html, body {
     </div>
   </div>
 
+  <button id="continueBtn" class="btn primary" style="min-width: 220px; position: relative; z-index: 5; display:none;">Continue · <span id="continueDay">Day 1</span></button>
+  <div id="continueGap" style="height:12px; display:none;"></div>
   <button id="beginBtn" class="btn primary" style="min-width: 220px; position: relative; z-index: 5;">Begin · 7 nights</button>
   <div style="height:12px"></div>
   <button id="glideBtn" class="btn ghost" style="min-width: 220px; position: relative; z-index: 5;">Glide mode · easy</button>
+  <div style="height:12px"></div>
+  <button id="checkpointsBtn" class="btn ghost" style="min-width: 220px; position: relative; z-index: 5; display:none;">Return to a night…</button>
   <div style="height:20px"></div>
   <div style="font-family:var(--font-mono); font-size:9px; color:var(--ink-faint); letter-spacing:.18em; text-transform:uppercase; max-width:300px; text-align:center; line-height:1.7;">
     ~5 min per night · headphones ideal
@@ -997,8 +1070,11 @@ html, body {
 <section id="loom" class="screen">
   <div class="topbar">
     <div class="day">Day <span id="dayNum">1</span> / 7</div>
-    <div style="display:flex; gap:14px; align-items:center;">
-      <button id="muteBtn" onclick="toggleAudio()" style="background:none; border:none; color:var(--ink-dim); font-size:16px; cursor:pointer; padding:0;">♪</button>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <button id="undoBtn" class="hdr-btn" title="Undo">↶</button>
+      <button id="redoBtn" class="hdr-btn" title="Redo">↷</button>
+      <button id="historyBtn" class="hdr-btn" title="History (the Ledger)">☰</button>
+      <button id="muteBtn" onclick="toggleAudio()" class="hdr-btn" title="Sound">♪</button>
       <div class="mem">MEM <span class="num" id="memVal">1000</span></div>
     </div>
   </div>
@@ -1083,6 +1159,26 @@ html, body {
     <button class="btn primary" onclick="resetGame()">Begin again · NG+ Echo</button>
     <button class="btn ghost" onclick="shareTestament()">Copy Testament</button>
   </div>
+</section>
+
+<!-- ============ HISTORY / LEDGER ============ -->
+<section id="history" class="screen">
+  <div class="topbar">
+    <div class="day">The Ledger</div>
+    <button id="historyCloseBtn" class="hdr-btn" style="font-size:13px;">✕ Close</button>
+  </div>
+  <div class="ledger-sub">Every trace you have left. The detective reads this too.</div>
+  <div class="ledger-body" id="ledgerBody"></div>
+</section>
+
+<!-- ============ CHECKPOINTS ============ -->
+<section id="checkpoints" class="screen">
+  <div class="topbar">
+    <div class="day">Return to a night</div>
+    <button id="ckptCloseBtn" class="hdr-btn" style="font-size:13px;">✕ Close</button>
+  </div>
+  <div class="ledger-sub">Each Vigil is a checkpoint. Step back into any night and rewrite it.</div>
+  <div class="ledger-body" id="ckptBody"></div>
 </section>
 
 <div class="toast" id="toast"></div>
@@ -1792,9 +1888,11 @@ function renderLoomActions() {
   abstain.className = 'action-pill';
   abstain.textContent = 'Watch · do nothing today';
   abstain.onclick = () => {
+    pushUndo();
     STATE.interventionStyles.abstain += STATE.actsLeft;
     STATE.actsLeft = 0;
     setTopbar();
+    saveGame();
     toast("you choose not to interfere");
   };
   a.appendChild(abstain);
@@ -1821,6 +1919,7 @@ function glideDay() {
 
 // ---------- OPEN A MOMENT (diorama) ----------
 function openMoment(m, who) {
+  pushUndo();
   playCitizenTimbre(who);
   STATE.selectedMoment = m;
   STATE.selectedThread = who;
@@ -1830,6 +1929,7 @@ function openMoment(m, who) {
   STATE.watchTime[who] += 1;
   bumpAffect(m.affect);
   setTopbar();
+  saveGame();
 
   $('dioramaWho').textContent = `Watching · ${CITIZENS[who].name}`;
   $('dioramaCost').textContent = cost;
@@ -1926,6 +2026,7 @@ function bumpAffect(a) {
 function braidCoincidence(m, who) {
   const mech = m.mechanism;
   if (STATE.mem < mech.cost) { toast("not enough memory"); return; }
+  pushUndo();
   STATE.mem -= mech.cost;
   STATE.actsLeft -= 1;
   STATE.exposureScore += mech.evidence;
@@ -1961,6 +2062,7 @@ function braidCoincidence(m, who) {
     toast("braid set · the day quietly bends");
   }
   setTopbar();
+  saveGame();
   setTimeout(()=> { show('loom'); buildLoom(); }, 900);
 }
 
@@ -2120,6 +2222,7 @@ function confirmEdit() {
   // pay cost: edit costs 15 MEM
   const cost = 15;
   if (STATE.mem < cost) { toast("not enough memory"); return; }
+  pushUndo();
   STATE.mem -= cost;
   STATE.actsLeft -= 1;
   STATE.exposureScore += 2;
@@ -2163,6 +2266,7 @@ function confirmEdit() {
   STATE.log.push({ day: STATE.day, who, kind: 'edit', target, choice: choice.word });
 
   setTopbar();
+  saveGame();
 }
 
 function pickTone(axes) {
@@ -2324,6 +2428,7 @@ function markKeep(el, c, all) {
   STATE.keptMemories.push(c);
   if (c.affect === 'tender' || c.affect === 'warm') STATE.sentimentalKeeps += 1;
   setTopbar();
+  saveGame();
   checkPruneComplete(all);
 }
 
@@ -2340,6 +2445,7 @@ function markPrune(el, c, all) {
   STATE.keptMemories = STATE.keptMemories.filter(x => x.id !== c.id);
   if (!alreadyPruned) STATE.mem += 12;
   setTopbar();
+  saveGame();
   checkPruneComplete(all);
 }
 
@@ -2367,13 +2473,19 @@ function sleepAndAdvance() {
   STATE.actsLeft = 3;
   // memory regenerates a little overnight
   STATE.mem = Math.min(1000, STATE.mem + 20);
+  // sleeping locks the day — clear the in-day undo trail, checkpoint the new night
+  UNDO.stack = []; UNDO.redo = [];
+  updateUndoUI();
+  saveGame();
   if (STATE.day > STATE.maxDays) {
     showEpilogue();
     return;
   }
+  saveCheckpoint();
   buildLoom();
   show('loom');
   showDayOverlay();
+  saveGame();
 }
 
 // ---------- EPILOGUE (the Mirror) ----------
@@ -2437,6 +2549,7 @@ function showEpilogue() {
   ).join('');
 
   show('epilogue');
+  saveGame();
   window._lastTestament = `LITTLE GODS · ${name}\n` + lines.map(([k,v]) => `${k}: ${v}`).join('\n');
 }
 
@@ -2465,18 +2578,220 @@ function resetGame() {
     exposureScore: 0, sentimentalKeeps: 0, protectiveActs: 0, growthActs: 0, controlActs: 0,
     glideMode: false,
   });
+  UNDO.stack = []; UNDO.redo = [];
+  CKPTS.length = 0;
+  try { localStorage.removeItem(CKPT_KEY); } catch (e) {}
+  updateUndoUI();
+  saveCheckpoint();
   buildLoom();
   show('loom');
   showDayOverlay();
+  saveGame();
   toast('Echo · the block remembers');
 }
 
 function startGame(glide=false) {
   audioInit();
-  STATE.glideMode = !!glide;
+  // fresh run
+  DAILY_CONTENT.forEach(d => d.moments.forEach(m => { delete m._intervened; delete m._glided; delete m._opened; }));
+  Object.assign(STATE, {
+    day: 1, maxDays: 7, mem: 1000, actsLeft: 3, todayMoments: [],
+    selectedThread: null, selectedMoment: null, pendingEdit: null,
+    receipts: [], log: [], watchTime: { maya: 0, theo: 0, sol: 0 },
+    affectTally: { warmth: 0, alarm: 0, blame: 0, distance: 0, need: 0, finality: 0 },
+    interventionStyles: { coincidence: 0, edit: 0, abstain: 0 },
+    keptMemories: [], prunedMemories: [], frays: [],
+    exposureScore: 0, sentimentalKeeps: 0, protectiveActs: 0, growthActs: 0, controlActs: 0,
+    glideMode: !!glide,
+  });
+  UNDO.stack = []; UNDO.redo = [];
+  CKPTS.length = 0;
+  saveCheckpoint();
   show('loom');
   buildLoom();
   showDayOverlay();
+  saveGame();
+}
+
+// ============================================================
+// SAVE · HISTORY · UNDO/REDO · CHECKPOINTS
+// localStorage-backed. No server, no account. (Play-ready.)
+// ============================================================
+const SAVE_KEY = 'littlegods_save_v1';
+const CKPT_KEY = 'littlegods_ckpts_v1';
+const UNDO = { stack: [], redo: [], cap: 60 };
+const CKPTS = [];
+
+function serializeState() {
+  const mf = {};
+  DAILY_CONTENT.forEach(d => d.moments.forEach(m => {
+    if (m._intervened) (mf[m.id] = mf[m.id] || {}).i = 1;
+  }));
+  // deep-clone STATE minus transient DOM-ish fields
+  const s = JSON.parse(JSON.stringify(STATE));
+  delete s.selectedMoment; delete s.pendingEdit; delete s.todayMoments;
+  return { v: 1, s, mf };
+}
+
+function applyState(snap) {
+  if (!snap || !snap.s) return;
+  DAILY_CONTENT.forEach(d => d.moments.forEach(m => { delete m._intervened; delete m._glided; delete m._opened; }));
+  for (const k of Object.keys(STATE)) {
+    if (['selectedMoment','pendingEdit','todayMoments'].includes(k)) continue;
+    delete STATE[k];
+  }
+  Object.assign(STATE, snap.s);
+  STATE.todayMoments = [];
+  if (snap.mf) {
+    DAILY_CONTENT.forEach(d => d.moments.forEach(m => { if (snap.mf[m.id] && snap.mf[m.id].i) m._intervened = true; }));
+  }
+}
+
+function saveGame() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(serializeState())); } catch (e) {}
+}
+function hasSave() {
+  try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+}
+function loadSaveSnapshot() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return null; }
+}
+
+// ---- UNDO / REDO ----
+function pushUndo() {
+  UNDO.stack.push(serializeState());
+  if (UNDO.stack.length > UNDO.cap) UNDO.stack.shift();
+  UNDO.redo = [];
+  updateUndoUI();
+}
+function doUndo() {
+  if (!UNDO.stack.length) return;
+  UNDO.redo.push(serializeState());
+  applyState(UNDO.stack.pop());
+  afterTimeTravel('undone');
+}
+function doRedo() {
+  if (!UNDO.redo.length) return;
+  UNDO.stack.push(serializeState());
+  applyState(UNDO.redo.pop());
+  afterTimeTravel('redone');
+}
+function afterTimeTravel(verb) {
+  playTick(700);
+  if (STATE.day > STATE.maxDays) { show('loom'); }
+  buildLoom();
+  show('loom');
+  updateUndoUI();
+  saveGame();
+  toast('action ' + verb);
+}
+function updateUndoUI() {
+  const u = document.getElementById('undoBtn');
+  const r = document.getElementById('redoBtn');
+  if (u) u.disabled = UNDO.stack.length === 0;
+  if (r) r.disabled = UNDO.redo.length === 0;
+}
+
+// ---- CHECKPOINTS (one per night/day-start) ----
+function saveCheckpoint() {
+  const snap = serializeState();
+  // replace existing checkpoint for this day, else add
+  const idx = CKPTS.findIndex(c => c.day === STATE.day);
+  const entry = { day: STATE.day, label: DAY_EPIGRAPHS[STATE.day-1] || '', snap, mem: STATE.mem };
+  if (idx >= 0) CKPTS[idx] = entry; else CKPTS.push(entry);
+  try { localStorage.setItem(CKPT_KEY, JSON.stringify(CKPTS)); } catch (e) {}
+}
+function loadCheckpoints() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(CKPT_KEY));
+    if (Array.isArray(arr)) { CKPTS.length = 0; arr.forEach(c => CKPTS.push(c)); }
+  } catch (e) {}
+}
+function restoreCheckpoint(day) {
+  const c = CKPTS.find(x => x.day === day);
+  if (!c) return;
+  applyState(c.snap);
+  UNDO.stack = []; UNDO.redo = [];
+  updateUndoUI();
+  buildLoom();
+  show('loom');
+  showDayOverlay();
+  saveGame();
+  toast('returned to Day ' + day);
+}
+function openCheckpoints() {
+  const body = document.getElementById('ckptBody');
+  body.innerHTML = '';
+  if (!CKPTS.length) {
+    body.innerHTML = '<div class="ledger-row empty">No nights recorded yet.</div>';
+  } else {
+    CKPTS.slice().sort((a,b)=>a.day-b.day).forEach(c => {
+      const row = document.createElement('div');
+      const isCurrent = c.day === STATE.day;
+      row.className = 'ckpt-row' + (isCurrent ? ' current' : '');
+      row.innerHTML = `<div class="ck-day">Day ${String(c.day).padStart(2,'0')}${isCurrent?' · now':''}</div>
+        <div class="ck-meta"><span class="amber">${c.mem} MEM</span> · ${escapeHtml(c.label||'')}</div>`;
+      if (!isCurrent) row.onclick = () => restoreCheckpoint(c.day);
+      body.appendChild(row);
+    });
+  }
+  show('checkpoints');
+}
+
+// ---- HISTORY / LEDGER ----
+function openHistory() {
+  const body = document.getElementById('ledgerBody');
+  body.innerHTML = '';
+  if (!STATE.log || !STATE.log.length) {
+    body.innerHTML = '<div class="ledger-row empty">No interventions yet. You have only watched.</div>';
+  } else {
+    STATE.log.slice().reverse().forEach(e => {
+      const row = document.createElement('div');
+      const kind = e.kind === 'edit' ? 'edit' : 'braid';
+      row.className = 'ledger-row ' + kind;
+      const who = CITIZENS[e.who] ? CITIZENS[e.who].name : (e.who||'').toUpperCase();
+      const detail = e.kind === 'edit'
+        ? `edited “${escapeHtml(e.target)}” → “${escapeHtml(e.choice)}”`
+        : escapeHtml(e.label || 'coincidence');
+      row.innerHTML = `<span class="lk">Day ${e.day} · ${e.kind}</span>
+        <span class="lv"><span class="who">${who}</span><br>${detail}</span>`;
+      body.appendChild(row);
+    });
+  }
+  show('history');
+}
+
+// ---- COVER / CONTROLS WIRING ----
+function refreshCoverButtons() {
+  const has = hasSave();
+  const snap = has ? loadSaveSnapshot() : null;
+  const cont = document.getElementById('continueBtn');
+  const gap = document.getElementById('continueGap');
+  const ck = document.getElementById('checkpointsBtn');
+  if (cont && snap && snap.s) {
+    cont.style.display = '';
+    if (gap) gap.style.display = '';
+    const d = Math.min(snap.s.day || 1, 7);
+    document.getElementById('continueDay').textContent = (snap.s.day > 7) ? 'Epilogue' : ('Day ' + d);
+  } else if (cont) {
+    cont.style.display = 'none';
+    if (gap) gap.style.display = 'none';
+  }
+  loadCheckpoints();
+  if (ck) ck.style.display = (CKPTS.length > 1) ? '' : 'none';
+}
+
+function continueGame() {
+  audioInit();
+  const snap = loadSaveSnapshot();
+  if (!snap) { startGame(false); return; }
+  applyState(snap);
+  UNDO.stack = []; UNDO.redo = [];
+  updateUndoUI();
+  if (STATE.day > STATE.maxDays) { showEpilogue(); return; }
+  buildLoom();
+  show('loom');
+  toast('continued · Day ' + STATE.day);
 }
 
 if ('serviceWorker' in navigator) {
@@ -2485,12 +2800,20 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// wire cover buttons (script runs at body-end, DOM ready)
-(function wireCover() {
-  const b = document.getElementById('beginBtn');
-  const g = document.getElementById('glideBtn');
-  if (b) b.addEventListener('click', () => startGame(false));
-  if (g) g.addEventListener('click', () => startGame(true));
+// wire all buttons (script runs at body-end, DOM ready)
+(function wireUI() {
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('beginBtn', () => startGame(false));
+  on('glideBtn', () => startGame(true));
+  on('continueBtn', continueGame);
+  on('checkpointsBtn', openCheckpoints);
+  on('undoBtn', doUndo);
+  on('redoBtn', doRedo);
+  on('historyBtn', openHistory);
+  on('historyCloseBtn', () => { show('loom'); buildLoom(); });
+  on('ckptCloseBtn', () => { show('loom'); buildLoom(); });
+  refreshCoverButtons();
+  updateUndoUI();
 })();
 
 // ============================================================

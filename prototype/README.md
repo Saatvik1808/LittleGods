@@ -58,6 +58,13 @@ If miss → before scaling, fix attachment density (more daily moments, deeper R
    - Or native port — 6–9 months solo, true 60fps shaders, haptics, lock-screen Night Watch notifications
 4. Play Console: $25 one-time dev fee, internal testing track first (up to 100 testers), closed beta (1k), open beta, then production.
 
+## Save system (no account, no server — Play-ready)
+- **Continue** — autosaves after every action to `localStorage`; the cover shows `Continue · Day N` to resume exactly where you left off (survives app kill / phone restart).
+- **Checkpoints** — every Vigil (night) writes a restore point. `Return to a night…` lets you step back into any past night and rewrite it.
+- **Undo / Redo** — `↶ ↷` in the Loom header step back/forward through your actions (watch, edit, braid, abstain). Cleared when you sleep — a finished night is locked, matching the bible's "watching has a cost."
+- **History (the Ledger)** — `☰` opens a log of every intervention: day, citizen, what you did. This is the bible's Ledger made literal — the trail the detective reads.
+- **No Google sign-in required.** Single-player, offline, on-device. Google Play Games cloud-save is an optional later add — local save is enough to ship.
+
 ## Visual / audio tech (added in polish pass)
 - **3D establishing shot** — Three.js (r128, CDN, service-worker cached). Procedural Greywater Block tower: window-grid canvas texture (warm-lit / cold-TV / dark windows + one pulsing "AI window"), roof water tank, fogged neighbor blocks, wet-ground reflection, falling rain (point cloud with gravity + wind slant), slow crane camera. Plays on every day transition, tap-to-skip. Falls back to text-only if WebGL/Three unavailable.
 - **Cinematic diorama** — ken-burns slow zoom, parallax silhouette layer, canvas ember/dust particle field tinted per citizen, scanlines, film grain, vignette, drop-cap typography, typewriter reveal.

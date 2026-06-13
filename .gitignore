@@ -6,9 +6,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
-
-# Claude Code local
-.claude/settings.local.json
+.tooling/
 
 # Node (future tooling / Bubblewrap)
 node_modules/
