@@ -55,8 +55,10 @@ html, body {
 }
 .screen { position: absolute; inset: 0; display: none; flex-direction: column; }
 .screen.active { display: flex; }
-.fade-in { animation: fadeIn .6s ease both; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn .5s cubic-bezier(.22,.61,.36,1) both; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(1.015) translateY(10px); filter: blur(3px); } to { opacity: 1; transform: none; filter: blur(0); } }
+.screen.leaving { display: flex; z-index: 1; animation: fadeOut .22s ease both; pointer-events: none; }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 
 /* ---------- TOP BAR ---------- */
 .topbar {
@@ -724,6 +726,25 @@ html, body {
   animation: kenBurns 18s ease-out forwards;
 }
 .diorama-art.shown { opacity: 1; }
+/* camera push: a quick settle-in zoom when a scene opens, then the slow ken-burns */
+.diorama-art.pushing { animation: cameraPush 1.0s cubic-bezier(.16,.8,.3,1) forwards, kenBurns 18s ease-out 1s forwards; }
+@keyframes cameraPush {
+  0%   { transform: scale(1.22) translate(0,1.5%); opacity: 0; filter: blur(6px) brightness(1.4); }
+  55%  { opacity: 1; }
+  100% { transform: scale(1.0) translate(0,0); opacity: 1; filter: blur(0) brightness(1); }
+}
+/* bloom flash — a soft light bursts as the lens focuses */
+.diorama-flash {
+  position: absolute; inset: 0; z-index: 6; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 45% 38%, rgba(240,200,130,.55), rgba(240,200,130,0) 60%);
+  mix-blend-mode: screen;
+}
+.diorama-flash.fire { animation: bloomFlash .85s ease-out forwards; }
+@keyframes bloomFlash {
+  0%   { opacity: 0; transform: scale(1.1); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.0); }
+}
 .diorama-frame.has-art .diorama-stage { opacity: 0; }
 .diorama-frame.has-art .diorama-window-light { opacity: .4; }
 .diorama-stage {
@@ -1267,6 +1288,7 @@ html, body {
   </div>
   <div class="diorama-frame" id="dioramaFrame">
     <div class="diorama-art" id="dioramaArt"></div>
+    <div class="diorama-flash" id="dioramaFlash"></div>
     <div class="diorama-stage" id="dioramaStage">
       <div class="diorama-window-light"></div>
       <div class="diorama-silhouette" id="dioramaSilhouette"></div>
@@ -1716,9 +1738,17 @@ function getDayMoments() {
 // ---------- DOM HELPERS ----------
 const $ = (id) => document.getElementById(id);
 function show(id) {
+  const cur = document.querySelector('.screen.active');
+  const next = $(id);
+  if (cur && cur !== next) {
+    // brief fade-out of the leaving screen for a soft cross-cut
+    const leaving = cur;
+    leaving.classList.add('leaving');
+    setTimeout(() => leaving.classList.remove('leaving'), 240);
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  $(id).classList.add('active', 'fade-in');
-  setTimeout(()=>$(id).classList.remove('fade-in'), 700);
+  next.classList.add('active', 'fade-in');
+  setTimeout(()=>next.classList.remove('fade-in'), 600);
   if (id !== 'diorama' && typeof stopDioramaParticles === 'function') stopDioramaParticles();
   if (id !== 'loom' && typeof pauseLoomHub === 'function') pauseLoomHub();
   if (id === 'loom' && LOOMHUB.inited) {
@@ -1791,13 +1821,25 @@ function setDioramaArt(who, band, override) {
   if (!frame || !art) return;
   const key = override || ART_MANIFEST[`${who}_${band}`] || ART_MANIFEST[who];
   // reset
-  art.classList.remove('shown'); frame.classList.remove('has-art');
+  art.classList.remove('shown', 'pushing'); frame.classList.remove('has-art');
   if (!key) { art.style.backgroundImage = ''; return; }
   const src = 'art/' + key;
   const img = new Image();
-  img.onload = () => { art.style.backgroundImage = `url("${src}")`; art.classList.add('shown'); frame.classList.add('has-art'); };
+  img.onload = () => {
+    art.style.backgroundImage = `url("${src}")`;
+    frame.classList.add('has-art');
+    // camera push-in + bloom flash on reveal
+    art.classList.remove('pushing'); void art.offsetWidth; art.classList.add('pushing', 'shown');
+    fireDioramaFlash();
+  };
   img.onerror = () => { art.style.backgroundImage = ''; }; // silently fall back
   img.src = src;
+}
+
+function fireDioramaFlash() {
+  const f = document.getElementById('dioramaFlash');
+  if (!f) return;
+  f.classList.remove('fire'); void f.offsetWidth; f.classList.add('fire');
 }
 
 // ---------- DIORAMA PARTICLES (embers / dust / depth) ----------
@@ -2534,6 +2576,7 @@ function openMoment(m, who) {
   _openingMoment = true;
   setTimeout(() => { _openingMoment = false; }, 350);
   pushUndo();
+  playShutter();                 // surveillance-cam focus
   playCitizenTimbre(who);
   STATE.selectedMoment = m;
   STATE.selectedThread = who;
@@ -3735,6 +3778,34 @@ function playSplice() {
 }
 
 // ----- Receipt typewriter (Vigil) -----
+// Surveillance-cam shutter: a mechanical clack as you focus into a life.
+function playShutter() {
+  if (!AUDIO.on || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx, now = ctx.currentTime;
+  // sharp click (noise burst)
+  const nb = makeNoiseBuffer(ctx, 0.04);
+  const src = ctx.createBufferSource(); src.buffer = nb;
+  const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2600; bp.Q.value=1.2;
+  const g1 = ctx.createGain(); g1.gain.value=0.0;
+  src.connect(bp); bp.connect(g1); g1.connect(AUDIO.master);
+  g1.gain.linearRampToValueAtTime(0.16, now+0.004); g1.gain.exponentialRampToValueAtTime(0.001, now+0.05);
+  src.start(now); src.stop(now+0.06);
+  // mechanical thunk (low body)
+  const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=160;
+  const g2 = ctx.createGain(); g2.gain.value=0;
+  o.connect(g2); g2.connect(AUDIO.master);
+  g2.gain.linearRampToValueAtTime(0.13, now+0.01); o.frequency.exponentialRampToValueAtTime(70, now+0.12);
+  g2.gain.exponentialRampToValueAtTime(0.001, now+0.16);
+  o.start(now); o.stop(now+0.18);
+  // second softer click (shutter return)
+  const o2 = ctx.createOscillator(); o2.type='square'; o2.frequency.value=1900;
+  const g3 = ctx.createGain(); g3.gain.value=0;
+  o2.connect(g3); g3.connect(AUDIO.master);
+  g3.gain.linearRampToValueAtTime(0.05, now+0.085); g3.gain.exponentialRampToValueAtTime(0.001, now+0.13);
+  o2.start(now+0.08); o2.stop(now+0.14);
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+
 function playReceiptArrival() {
   if (!AUDIO.on || !AUDIO.ctx) return;
   const ctx = AUDIO.ctx;
