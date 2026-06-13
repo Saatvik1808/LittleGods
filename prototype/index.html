@@ -2187,20 +2187,72 @@ const LOOMHUB = { inited: false, raf: null, alive: false, windows: {}, t: 0 };
 const HUB_WIN_POS = { maya: [-2.2, 3.0], theo: [2.3, -1.0], sol: [0.1, -4.4] };
 
 function hubFacadeTexture() {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 448;
+  const W=512, H=896;
+  const c = document.createElement('canvas'); c.width=W; c.height=H;
   const g = c.getContext('2d');
-  g.fillStyle = '#14110d'; g.fillRect(0, 0, 256, 448);
-  for (let i = 0; i < 2200; i++) { g.fillStyle = `rgba(40,34,26,${Math.random()*0.3})`; g.fillRect(Math.random()*256, Math.random()*448, 2, 2); }
-  const cols = 6, rows = 9, mx = 14, my = 14;
-  const cw = (256 - mx*(cols+1))/cols, ch = (448 - my*(rows+1))/rows;
-  let rng = 12345; const rand = () => { rng = (rng*9301+49297)%233280; return rng/233280; };
-  for (let r=0;r<rows;r++) for (let cc=0;cc<cols;cc++) {
-    const x = mx+cc*(cw+mx), y = my+r*(ch+my), lit = rand();
-    g.fillStyle = lit>0.7 ? 'rgba(150,120,70,.30)' : lit>0.5 ? 'rgba(60,72,96,.25)' : 'rgba(8,8,10,.9)';
-    g.fillRect(x,y,cw,ch);
-    g.strokeStyle='rgba(0,0,0,.6)'; g.lineWidth=1.4; g.strokeRect(x,y,cw,ch);
+  // weathered concrete base with a vertical light falloff (darker up top)
+  const base = g.createLinearGradient(0,0,0,H);
+  base.addColorStop(0,'#0c0a08'); base.addColorStop(0.5,'#15110c'); base.addColorStop(1,'#100c09');
+  g.fillStyle=base; g.fillRect(0,0,W,H);
+  // grime / concrete grain
+  for (let i=0;i<9000;i++){ g.fillStyle=`rgba(${30+Math.random()*30|0},${26+Math.random()*24|0},${20+Math.random()*18|0},${Math.random()*0.25})`; g.fillRect(Math.random()*W, Math.random()*H, 2, 1+Math.random()*2); }
+  // vertical water streaks
+  for (let i=0;i<40;i++){ const x=Math.random()*W; g.fillStyle=`rgba(0,0,0,${0.04+Math.random()*0.06})`; g.fillRect(x, 0, 1+Math.random()*2, H); }
+  const cols=6, rows=11, mx=20, my=18;
+  const cw=(W-mx*(cols+1))/cols, ch=(H-my*(rows+1))/rows;
+  let rng=20260614; const rand=()=>{ rng=(rng*9301+49297)%233280; return rng/233280; };
+  for (let r=0;r<rows;r++) for (let cc=0;cc<cols;cc++){
+    const x=mx+cc*(cw+mx), y=my+r*(ch+my), lit=rand();
+    // recessed dark frame
+    g.fillStyle='#070605'; g.fillRect(x-3,y-3,cw+6,ch+6);
+    if (lit>0.78){ // warm lit room — soft radial glow, not a flat square
+      const gr=g.createRadialGradient(x+cw/2,y+ch*0.42,2,x+cw/2,y+ch/2,cw*0.9);
+      gr.addColorStop(0,'rgba(240,196,120,0.55)'); gr.addColorStop(0.5,'rgba(180,140,80,0.35)'); gr.addColorStop(1,'rgba(40,30,18,0.15)');
+      g.fillStyle=gr; g.fillRect(x,y,cw,ch);
+    } else if (lit>0.6){ // cold tv glow
+      const gr=g.createRadialGradient(x+cw/2,y+ch/2,2,x+cw/2,y+ch/2,cw*0.9);
+      gr.addColorStop(0,'rgba(90,120,150,0.30)'); gr.addColorStop(1,'rgba(20,30,40,0.10)');
+      g.fillStyle=gr; g.fillRect(x,y,cw,ch);
+    } else { // dark
+      g.fillStyle='rgba(6,6,8,0.95)'; g.fillRect(x,y,cw,ch);
+    }
+    // mullions
+    g.strokeStyle='rgba(0,0,0,0.7)'; g.lineWidth=1.5; g.strokeRect(x,y,cw,ch);
+    g.beginPath(); g.moveTo(x+cw/2,y); g.lineTo(x+cw/2,y+ch); g.moveTo(x,y+ch/2); g.lineTo(x+cw,y+ch/2); g.stroke();
   }
-  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  const t = new THREE.CanvasTexture(c); t.anisotropy=8; return t;
+}
+
+// load a citizen's scene painting as a WINDOW texture: brightened (lit from
+// within) and cropped to the upper portion (the dark bottom is for diorama text).
+const HUB_TEX = {};
+function getSceneTexture(who, band) {
+  const key = ART_MANIFEST[`${who}_${band}`] || ART_MANIFEST[who];
+  if (!key) return null;
+  if (HUB_TEX[key] !== undefined) return HUB_TEX[key];
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 320;
+  const cx = cv.getContext('2d');
+  cx.fillStyle = '#1a130c'; cx.fillRect(0,0,256,320);   // warm placeholder until loaded
+  const tex = new THREE.CanvasTexture(cv);
+  HUB_TEX[key] = tex;
+  const img = new Image();
+  img.onload = () => {
+    // crop to top ~70% (skip the dark text area), brighten so the room reads as lit
+    const sh = img.height * 0.70;
+    cx.filter = 'brightness(1.75) contrast(1.04) saturate(1.05)';
+    cx.drawImage(img, 0, 0, img.width, sh, 0, 0, 256, 320);
+    cx.filter = 'none';
+    // warm bloom wash so it glows like a window
+    cx.globalCompositeOperation = 'soft-light';
+    const gr = cx.createRadialGradient(128,120,10,128,150,180);
+    gr.addColorStop(0,'rgba(240,200,130,0.5)'); gr.addColorStop(1,'rgba(60,40,20,0)');
+    cx.fillStyle = gr; cx.fillRect(0,0,256,320);
+    cx.globalCompositeOperation = 'source-over';
+    tex.needsUpdate = true;
+  };
+  img.onerror = () => {};
+  img.src = 'art/'+key;
+  return tex;
 }
 
 // A soft person-silhouette texture for the lit windows (someone is home).
@@ -2270,27 +2322,30 @@ function initLoomHub() {
   const amb=new THREE.AmbientLight(0x223044,0.65); scene.add(amb);
   const key=new THREE.DirectionalLight(0xffcf8a,0.4); key.position.set(-6,10,8); scene.add(key);
 
-  // citizen windows
+  // citizen windows — you look INTO their lit, painted room
   const windows = {};
-  const poseByWho = { maya:'stand', theo:'sit', sol:'sit' };
   ['maya','theo','sol'].forEach(who=>{
     const [x,y]=HUB_WIN_POS[who];
     const grp=new THREE.Group(); grp.position.set(x,y,3.02);
-    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.9,2.3), new THREE.MeshBasicMaterial({color:0x000000})); grp.add(frame);
-    const glass=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.9), new THREE.MeshBasicMaterial({color:0xd4a04a}));
-    glass.position.z=0.02; glass.userData.who=who; grp.add(glass);
-    // the resident — a soft silhouette behind the lit glass
-    const figTex = hubFigureTexture(poseByWho[who]);
-    const figure = new THREE.Mesh(new THREE.PlaneGeometry(0.9,1.5),
-      new THREE.MeshBasicMaterial({ map:figTex, transparent:true, opacity:0.9, depthWrite:false }));
-    figure.position.set(0, -0.15, 0.03); figure.raycast=function(){}; grp.add(figure);
-    // mullions
-    const mull=new THREE.Mesh(new THREE.PlaneGeometry(0.07,1.9), new THREE.MeshBasicMaterial({color:0x1a140c})); mull.position.z=0.04; grp.add(mull);
-    // soft halo behind
-    const halo=new THREE.Mesh(new THREE.PlaneGeometry(3.4,3.8), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
-    halo.position.z=-0.05; halo.raycast=function(){}; grp.add(halo);
+    // deep recessed dark frame (sill + reveal)
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(2.1,2.6), new THREE.MeshBasicMaterial({color:0x050403})); grp.add(frame);
+    // the glass shows the citizen's current scene painting, lit from within
+    const glass=new THREE.Mesh(new THREE.PlaneGeometry(1.7,2.15),
+      new THREE.MeshBasicMaterial({ color:0x2a2018, transparent:false }));
+    glass.position.z=0.03; glass.userData.who=who; grp.add(glass);
+    // warm inner-edge glow (window light spilling onto the facade)
+    const spill=new THREE.Mesh(new THREE.PlaneGeometry(2.3,2.8), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    spill.position.z=0.015; spill.raycast=function(){}; grp.add(spill);
+    // mullions (window cross) over the glass
+    const mh=new THREE.Mesh(new THREE.PlaneGeometry(1.7,0.05), new THREE.MeshBasicMaterial({color:0x0a0806})); mh.position.z=0.05; grp.add(mh);
+    const mv=new THREE.Mesh(new THREE.PlaneGeometry(0.05,2.15), new THREE.MeshBasicMaterial({color:0x0a0806})); mv.position.z=0.05; grp.add(mv);
+    // multi-layer additive bloom for a premium glow
+    const halo1=new THREE.Mesh(new THREE.PlaneGeometry(3.2,3.8), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    halo1.position.z=-0.05; halo1.raycast=function(){}; grp.add(halo1);
+    const halo2=new THREE.Mesh(new THREE.PlaneGeometry(5.4,6.0), new THREE.MeshBasicMaterial({color:0xd4a04a, transparent:true, opacity:0.0, blending:THREE.AdditiveBlending, depthWrite:false}));
+    halo2.position.z=-0.1; halo2.raycast=function(){}; grp.add(halo2);
     scene.add(grp);
-    windows[who]={ grp, glass, halo, frame, figure, baseX: 0 };
+    windows[who]={ grp, glass, spill, halo:halo1, halo2, frame, lastBand:null };
   });
 
   // rain
@@ -2367,41 +2422,36 @@ function hubLoop(){
   if (!LOOMHUB.alive){ LOOMHUB.raf=null; return; }
   LOOMHUB.t += 0.016;
   const t=LOOMHUB.t;
-  // camera sway
-  LOOMHUB.cam.position.x = Math.sin(t*0.18)*0.5;
-  LOOMHUB.cam.position.y = 0.5 + Math.sin(t*0.13)*0.25;
-  LOOMHUB.cam.lookAt(0,-0.5,0);
-  // window glow by state
+  // cinematic camera: slow orbit + breathing dolly for a dimensional, living feel
+  LOOMHUB.cam.position.x = Math.sin(t*0.15)*0.9;
+  LOOMHUB.cam.position.y = 0.6 + Math.sin(t*0.11)*0.35;
+  LOOMHUB.cam.position.z = 16.5 + Math.sin(t*0.07)*1.1;
+  LOOMHUB.cam.lookAt(Math.sin(t*0.15)*0.3, -0.4, 0);
+  // each window shows the citizen's lit, painted room; glow + bloom by state
   ['maya','theo','sol'].forEach(who=>{
-    const st=citizenState(who), band=bandFor(who), col=new THREE.Color(BAND_COLOR[band]||'#d4a04a');
+    const band=bandFor(who), col=new THREE.Color(BAND_COLOR[band]||'#d4a04a');
     const w=LOOMHUB.windows[who];
     const touched = (STATE.todayMoments||[]).find(x=>x.who===who && x._intervened);
-    let glow, pulse;
-    if (band==='analog'){ glow=0.06; pulse=0; col.set('#2a2730'); }
-    else if (band==='crisis'){ pulse=0.5+0.5*Math.sin(t*7); glow=0.7+pulse*0.3; }
-    else if (band==='tense'){ pulse=0.5+0.5*Math.sin(t*2.2); glow=0.55+pulse*0.2; }
-    else if (band==='recovering'){ pulse=0.5+0.5*Math.sin(t*1.2); glow=0.6+pulse*0.15; }
-    else { pulse=0.5+0.5*Math.sin(t*0.8); glow=0.5+pulse*0.1; }
-    w.glass.material.color.copy(col).multiplyScalar(0.4+glow*0.8);
-    w.halo.material.color.copy(col);
-    w.halo.material.opacity = band==='analog'?0.0:(0.10+glow*0.22);
-    if (touched) { w.halo.material.opacity *= 0.5; }
-    // the resident moves by their state: pacing when breaking, still when settled, gone when dark
-    if (w.figure){
-      if (band==='analog'){ w.figure.material.opacity = 0; }
-      else {
-        let amp, spd, vis;
-        if (band==='crisis'){ amp=0.32; spd=2.6; vis=0.95; }
-        else if (band==='tense'){ amp=0.16; spd=1.1; vis=0.9; }
-        else if (band==='recovering'){ amp=0.08; spd=0.7; vis=0.85; }
-        else { amp=0.05; spd=0.4; vis=0.8; }
-        const off = who.charCodeAt(0);
-        w.figure.position.x = Math.sin(t*spd + off)*amp;
-        w.figure.rotation.z = Math.sin(t*spd*0.7 + off)*amp*0.15;
-        // silhouette darker against a brighter (hotter) window
-        w.figure.material.opacity = vis;
-      }
+    // swap the room painting when the band changes
+    if (w.lastBand !== band){
+      const tex = getSceneTexture(who, band);
+      if (tex){ w.glass.material.map = tex; w.glass.material.color.setHex(0xffffff); }
+      else { w.glass.material.map = null; w.glass.material.color.copy(col).multiplyScalar(0.5); }
+      w.glass.material.needsUpdate = true;
+      w.lastBand = band;
     }
+    let glow, pulse, lit;
+    if (band==='analog'){ glow=0.0; pulse=0; lit=0.12; col.set('#2a2730'); }
+    else if (band==='crisis'){ pulse=0.5+0.5*Math.sin(t*6); glow=0.7+pulse*0.3; lit=0.85+pulse*0.15; }
+    else if (band==='tense'){ pulse=0.5+0.5*Math.sin(t*2.0); glow=0.5+pulse*0.18; lit=0.78+pulse*0.10; }
+    else if (band==='recovering'){ pulse=0.5+0.5*Math.sin(t*1.1); glow=0.55+pulse*0.15; lit=0.82+pulse*0.08; }
+    else { pulse=0.5+0.5*Math.sin(t*0.8); glow=0.45+pulse*0.1; lit=0.74+pulse*0.06; }
+    // room brightness (the painting glows as if lit from within)
+    if (w.glass.material.map){ w.glass.material.color.setScalar(lit); }
+    // window-light spill onto the facade + two-layer bloom halo
+    w.spill.material.color.copy(col); w.spill.material.opacity = band==='analog'?0.02:(0.12+glow*0.18);
+    w.halo.material.color.copy(col);  w.halo.material.opacity  = band==='analog'?0.0:(0.10+glow*0.20)*(touched?0.5:1);
+    w.halo2.material.color.copy(col); w.halo2.material.opacity = band==='analog'?0.0:(0.04+glow*0.10)*(touched?0.5:1);
     // label position (project window top to screen)
     const lbl=LOOMHUB.labels && LOOMHUB.labels[who];
     if (lbl){
