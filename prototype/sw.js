@@ -1,10 +1,11 @@
-const CACHE = "little-gods-v3";
+const CACHE = "little-gods-v4";
 const FILES = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./icon-192.svg",
-  "./icon-512.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable-512.png",
   "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
 ];
 
