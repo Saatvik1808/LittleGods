@@ -13,14 +13,18 @@ node_modules/
 *.log
 npm-debug.log*
 
-# Android build artifacts (future)
+# Android build artifacts + SIGNING SECRETS — never commit these
 *.keystore
 *.jks
 *.aab
 *.apk
+*signing-key-info*
 android/
 build/
 dist/
+# PWABuilder output (contains the signing keystore + password)
+prototype/Little Gods - Google Play package/
+**/Little Gods - Google Play package/
 
 # Temp
 /tmp/

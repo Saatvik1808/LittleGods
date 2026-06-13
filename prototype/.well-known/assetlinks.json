@@ -1,12 +1,10 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.saatvik.littlegods",
-      "sha256_cert_fingerprints": [
-        "REPLACE_WITH_YOUR_APP_SIGNING_SHA256_FROM_PLAY_CONSOLE"
-      ]
-    }
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.saatvik.littlegods",
+    "sha256_cert_fingerprints": [
+      "A7:7E:C9:A7:95:F6:0D:D4:BE:57:70:B7:1C:3B:82:40:3F:F8:F3:22:6E:25:B7:1E:08:89:CC:A2:44:D1:49:EC"
+    ]
   }
-]
+}]
