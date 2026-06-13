@@ -199,6 +199,8 @@ html, body {
 .btn.primary { border-color: var(--amber); color: var(--amber); }
 .btn.primary:hover, .btn.primary:active { background: var(--amber); color: var(--bg); }
 .btn.ghost { border-color: var(--ink-faint); color: var(--ink-dim); font-size: 11px; padding: 10px 18px; }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.45; pointer-events: none; cursor: default; }
 
 /* ---------- LOOM ---------- */
 #loom { background: var(--bg); }
@@ -1920,8 +1922,17 @@ function glideDay() {
   }, readMs);
 }
 
+// instant feedback + double-tap guard for diorama action buttons
+function lockDioramaActions() {
+  document.querySelectorAll('#dioramaActions .btn').forEach(b => { b.disabled = true; b.style.opacity = '0.45'; });
+}
+
 // ---------- OPEN A MOMENT (diorama) ----------
+let _openingMoment = false;
 function openMoment(m, who) {
+  if (_openingMoment) return;            // guard rapid double-taps on moment dots / Next
+  _openingMoment = true;
+  setTimeout(() => { _openingMoment = false; }, 350);
   pushUndo();
   playCitizenTimbre(who);
   STATE.selectedMoment = m;
@@ -2028,7 +2039,9 @@ function bumpAffect(a) {
 // ---------- BRAID A COINCIDENCE ----------
 function braidCoincidence(m, who) {
   const mech = m.mechanism;
+  if (m._intervened) return;                 // guard: already braided this moment
   if (STATE.mem < mech.cost) { toast("not enough memory"); return; }
+  lockDioramaActions();                       // instant feedback; blocks double-tap during the 900ms transition
   pushUndo();
   STATE.mem -= mech.cost;
   STATE.actsLeft -= 1;
@@ -2086,6 +2099,7 @@ function rollUnintended(mech, who) {
 function openChat(m, who) {
   const sit = CITIZENS[who].msgsBySituation[m.situation];
   if (!sit) { toast("no thread to read"); return; }
+  cancelEdit._busy = false;                   // reset double-tap lock for this session
   STATE.pendingEdit = { who, moment: m, situation: m.situation, target: null, choice: null };
   $('chatFrom').textContent = sit.from.toUpperCase();
   $('chatTo').textContent = sit.to.toUpperCase();
@@ -2212,6 +2226,9 @@ function selectTarget(target, bubbleEl, who) {
 }
 
 function cancelEdit() {
+  if (cancelEdit._busy) return;
+  cancelEdit._busy = true;
+  document.querySelectorAll('.edit-tray .btn').forEach(b => b.disabled = true);
   // let it send untouched
   const sit = CITIZENS[STATE.pendingEdit.who].msgsBySituation[STATE.pendingEdit.situation];
   showReply(sit.repliesByAffect['neutral'] || sit.repliesByAffect['warm'], false);
@@ -2225,6 +2242,11 @@ function confirmEdit() {
   // pay cost: edit costs 15 MEM
   const cost = 15;
   if (STATE.mem < cost) { toast("not enough memory"); return; }
+  if (moment._intervened) return;             // guard: already edited this message
+  // lock the tray instantly so the ~1.4s reply delay can't be double-sent
+  const _cbtn = document.getElementById('confirmEditBtn');
+  if (_cbtn) _cbtn.disabled = true;
+  document.querySelectorAll('.edit-tray .btn').forEach(b => b.disabled = true);
   pushUndo();
   STATE.mem -= cost;
   STATE.actsLeft -= 1;
