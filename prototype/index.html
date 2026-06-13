@@ -887,37 +887,56 @@ html, body {
 }
 .edit-options {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .word-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   background: var(--bg-soft);
   border: 1px solid var(--ink-faint);
+  border-bottom-width: 2px;
   color: var(--ink);
-  padding: 10px 16px;
-  font-family: var(--font-serif);
-  font-size: 16px;
-  border-radius: 22px;
+  padding: 11px 16px 9px;
+  border-radius: 12px;
   cursor: pointer;
-  position: relative;
+  min-width: 84px;
+  transition: transform .12s, box-shadow .2s, border-color .2s;
 }
-.word-chip:hover { border-color: var(--amber); }
-.word-chip.selected { background: var(--amber); color: var(--bg); border-color: var(--amber); }
-.word-chip .axes {
-  position: absolute;
-  bottom: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--font-mono);
-  font-size: 7px;
-  color: var(--ink-faint);
-  letter-spacing: .1em;
-  white-space: nowrap;
+.word-chip:active { transform: scale(0.96); }
+.word-chip .wc-word { font-family: var(--font-serif); font-size: 18px; line-height: 1; }
+.word-chip .wc-label {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-dim);
 }
-.word-chip.selected .axes { color: var(--amber); }
-.edit-confirm { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
+/* tone-tinted bottom border so the emotional weight reads at a glance */
+.word-chip.tone-warm   { border-bottom-color: var(--amber-hot); }
+.word-chip.tone-tender { border-bottom-color: #c896d8; }
+.word-chip.tone-cold   { border-bottom-color: var(--cyan); }
+.word-chip.tone-burned { border-bottom-color: var(--red); }
+.word-chip.tone-neutral{ border-bottom-color: var(--ink-faint); }
+.word-chip.selected {
+  border-color: var(--amber); background: rgba(212,160,74,.14);
+  box-shadow: 0 0 22px rgba(212,160,74,.22);
+}
+.word-chip.selected .wc-label { color: var(--amber); }
+.edit-impact {
+  display: flex; flex-direction: column; gap: 4px; align-items: center;
+  margin-bottom: 8px; min-height: 14px;
+}
+.edit-impact .imp {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .08em;
+  color: var(--ink-dim);
+}
+.edit-impact .imp.good { color: #9ac26a; }
+.edit-impact .imp.bad  { color: var(--red); }
+.edit-impact .imp.warn { color: var(--cyan); }
+.edit-confirm { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+.edit-confirm .btn { flex: 1; }
 
 /* ---------- VIGIL ---------- */
 #vigil {
@@ -942,17 +961,54 @@ html, body {
   margin-top: 6px;
   text-transform: uppercase;
 }
-.vigil-body { flex: 1; padding: 18px; overflow-y: auto; }
+.vigil-body { flex: 1; padding: 14px 16px; overflow-y: auto; }
+.vigil-section { margin-bottom: 22px; }
+.vsec-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--violet);
+  border-bottom: 1px solid var(--ink-faint);
+  padding-bottom: 7px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.vsec-sub { color: var(--ink-faint); font-size: 8px; letter-spacing: .15em; }
+.vigil-empty {
+  font-style: italic; color: var(--ink-faint); font-size: 13px;
+  text-align: center; padding: 8px 0 4px;
+}
+/* block-tonight status rows */
+.bt-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 64px;
+  grid-template-areas: "name bar band" "name bar flag";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.bt-name { grid-area: name; font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; }
+.bt-bar { grid-area: bar; height: 5px; background: rgba(255,255,255,.07); border-radius: 3px; overflow: hidden; }
+.bt-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+.bt-band { grid-area: band; font-family: var(--font-mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; text-align: right; }
+.bt-flag { grid-area: flag; font-family: var(--font-mono); font-size: 7px; letter-spacing: .1em; text-transform: uppercase; text-align: right; color: var(--ink-dim); }
 .receipt {
   border: 1px solid var(--ink-faint);
+  border-left: 2px solid var(--amber);
   background: rgba(255,255,255,.02);
-  padding: 14px;
-  margin-bottom: 16px;
+  padding: 13px 14px;
+  margin-bottom: 12px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink);
   line-height: 1.6;
+  border-radius: 0 4px 4px 0;
 }
+.receipt-intended { margin-top: 9px; font-style: italic; color: var(--ink); line-height: 1.5; font-family: var(--font-serif); font-size: 13px; }
 .receipt .head {
   color: var(--amber);
   letter-spacing: .15em;
@@ -971,22 +1027,28 @@ html, body {
 }
 .prune-prompt {
   font-style: italic;
-  color: var(--violet);
+  color: var(--ink-dim);
   text-align: center;
-  padding: 20px 8px;
-  font-size: 14px;
+  padding: 4px 6px 16px;
+  font-size: 13px;
   line-height: 1.6;
 }
+.prune-prompt b { color: var(--violet); font-style: normal; font-weight: 400; }
 .memory {
+  position: relative;
+  display: flex;
   border: 1px solid var(--ink-faint);
-  padding: 14px;
   margin-bottom: 10px;
-  cursor: pointer;
   background: rgba(255,255,255,.02);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all .25s ease;
 }
+.memory .mem-accent { width: 3px; flex-shrink: 0; opacity: .8; }
+.memory .mem-body { flex: 1; padding: 13px 14px; }
 .memory.keeping { border-color: var(--amber); background: rgba(212,160,74,.10); box-shadow: 0 0 24px rgba(212,160,74,.18); }
-.memory.pruning { border-color: var(--red); background: rgba(184,88,80,.06); opacity: .35; filter: blur(.5px); transform: scale(.98); }
-.memory .what { font-style: italic; color: var(--ink); font-size: 14px; margin-bottom: 6px; }
+.memory.pruning { border-color: var(--red); background: rgba(184,88,80,.06); opacity: .4; filter: blur(.4px); transform: scale(.98); }
+.memory .what { font-style: italic; color: var(--ink); font-size: 14px; margin-bottom: 6px; line-height: 1.5; }
 .memory .meta {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -2473,7 +2535,6 @@ function openChat(m, who) {
   STATE.pendingEdit = { who, moment: m, situation: m.situation, target: null, choice: null };
   $('chatFrom').textContent = sit.from.toUpperCase();
   $('chatTo').textContent = sit.to.toUpperCase();
-  $('editFrom').textContent = sit.from;
   const stream = $('chatStream');
   stream.innerHTML = '';
   // build realistic timestamps starting from moment's authored time
@@ -2511,12 +2572,20 @@ function openChat(m, who) {
   stream.appendChild(reply);
   stream.scrollTop = stream.scrollHeight;
 
-  // clear tray
-  $('editTarget').textContent = '·';
-  $('editOptions').innerHTML = '<div style="font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); letter-spacing:.15em;">tap an underlined word above</div>';
-  $('confirmEditBtn').disabled = true;
-  $('affectPreview').textContent = '';
-  $('affectPreview').className = 'affect-preview';
+  // REBUILD the edit tray from scratch — showReply() destroys it after each reply,
+  // so we must reconstruct it for every chat session (this was the second-chat crash).
+  const tray = document.querySelector('.edit-tray');
+  tray.innerHTML = `
+    <div class="edit-prompt">tap an <span style="color:var(--amber)">underlined word</span> above</div>
+    <div class="edit-options" id="editOptions"></div>
+    <div class="affect-preview" id="affectPreview"></div>
+    <div class="edit-impact" id="editImpact"></div>
+    <div class="edit-confirm">
+      <button class="btn ghost" id="cancelEditBtn">Let it send</button>
+      <button class="btn primary" id="confirmEditBtn" disabled>Send the edit</button>
+    </div>`;
+  document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
+  document.getElementById('confirmEditBtn').addEventListener('click', confirmEdit);
   show('chat');
 }
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -2569,16 +2638,19 @@ function selectTarget(target, bubbleEl, who) {
   STATE.pendingEdit.choice = null;
   document.querySelectorAll('.bubble.editing').forEach(b => b.classList.remove('editing'));
   bubbleEl.classList.add('editing');
-  $('editTarget').textContent = `"${target}"`;
-  $('affectPreview').textContent = '';
-  $('affectPreview').className = 'affect-preview';
+  const ap = $('affectPreview'); if (ap) { ap.textContent = ''; ap.className = 'affect-preview'; }
+  const imp = $('editImpact'); if (imp) imp.innerHTML = '';
+  const prompt = document.querySelector('.edit-prompt');
+  if (prompt) prompt.innerHTML = `swap <span style="color:var(--amber)">"${escapeHtml(target)}"</span> for one of ${CITIZENS[who].name}'s own words`;
+  const cbtn = $('confirmEditBtn'); if (cbtn) cbtn.disabled = true;
   const opts = CITIZENS[who].vocab[target];
   const box = $('editOptions');
   box.innerHTML = '';
   opts.forEach(o => {
+    const tone = pickTone(o.axes);
     const chip = document.createElement('button');
-    chip.className = 'word-chip';
-    chip.innerHTML = `${o.word}<div class="axes">${o.label}</div>`;
+    chip.className = 'word-chip tone-' + tone;
+    chip.innerHTML = `<span class="wc-word">${o.word}</span><span class="wc-label">${o.label}</span>`;
     chip.onclick = () => {
       playTick(1400);
       document.querySelectorAll('.word-chip').forEach(c => c.classList.remove('selected'));
@@ -2586,13 +2658,27 @@ function selectTarget(target, bubbleEl, who) {
       STATE.pendingEdit.choice = o;
       $('confirmEditBtn').disabled = false;
       // live affect preview
-      const ap = $('affectPreview');
       const d = describeAffect(o.axes);
-      ap.className = 'affect-preview ' + d.cls;
-      ap.textContent = d.text;
+      if (ap) { ap.className = 'affect-preview ' + d.cls; ap.textContent = '“' + d.text + '”'; }
+      // predicted SIM impact on the citizen — show what the edit will DO
+      renderEditImpact(who, o.axes);
     };
     box.appendChild(chip);
   });
+}
+
+// Show the forecast effect of the chosen word on the citizen's state.
+function renderEditImpact(who, axes) {
+  const imp = $('editImpact'); if (!imp) return;
+  const eff = editEffects(axes);
+  const st = citizenState(who);
+  const pills = [];
+  const crisisName = (SIM_INIT[who] && SIM_INIT[who].crisisName) || 'their crisis';
+  if (eff.crisis < 0) pills.push(`<span class="imp good">${CITIZENS[who].name}: ${crisisName} eases ▼</span>`);
+  else if (eff.crisis > 0) pills.push(`<span class="imp bad">${CITIZENS[who].name}: ${crisisName} worsens ▲</span>`);
+  else pills.push(`<span class="imp">${CITIZENS[who].name}: little change</span>`);
+  pills.push(`<span class="imp warn">suspicion +${eff.suspicion} ${st.suspicion + eff.suspicion >= 80 ? '· risks going dark!' : ''}</span>`);
+  imp.innerHTML = pills.join('');
 }
 
 function cancelEdit() {
@@ -2726,68 +2812,85 @@ function enterVigil() {
   const body = $('vigilBody');
   body.innerHTML = '';
 
-  // 1) receipts due tonight (interventions from earlier days)
-  const dueReceipts = STATE.receipts.filter(r => r.day === STATE.day || r.day < STATE.day && !r._delivered);
+  const section = (title, sub) => {
+    const s = document.createElement('div');
+    s.className = 'vigil-section';
+    s.innerHTML = `<div class="vsec-title">${title}${sub ? `<span class="vsec-sub">${sub}</span>` : ''}</div>`;
+    body.appendChild(s);
+    return s;
+  };
+
+  // ---- A) THE BLOCK TONIGHT — reflective status snapshot of every life ----
+  const blockSec = section('The block tonight', `MEM ${STATE.mem}`);
+  ['maya','theo','sol'].forEach(key => {
+    const st = citizenState(key); const band = bandFor(key); const col = BAND_COLOR[band];
+    const tended = STATE._touchedToday && STATE._touchedToday[key];
+    const row = document.createElement('div');
+    row.className = 'bt-row';
+    row.innerHTML = `
+      <div class="bt-name" style="color:${CITIZENS[key].color}">${CITIZENS[key].name}</div>
+      <div class="bt-bar"><div class="bt-fill" style="width:${Math.round(st.crisis)}%; background:${col};"></div></div>
+      <div class="bt-band" style="color:${col}">${BAND_LABEL[band]}</div>
+      <div class="bt-flag">${tended ? '✓ tended' : (band==='crisis'||band==='analog' ? '⚠ untended' : '')}</div>`;
+    blockSec.appendChild(row);
+  });
+
+  // ---- B) CAUSALITY RECEIPTS — what your past acts actually caused ----
+  const dueReceipts = STATE.receipts.filter(r => r.day === STATE.day || (r.day < STATE.day && !r._delivered));
+  const recSec = section('Causality receipts', dueReceipts.length ? `${dueReceipts.length} arrived` : 'none tonight');
+  if (dueReceipts.length === 0) {
+    const e = document.createElement('div'); e.className = 'vigil-empty'; e.textContent = 'The block kept your secrets today.';
+    recSec.appendChild(e);
+  }
   dueReceipts.forEach(r => {
     r._delivered = true;
     const el = document.createElement('div');
     el.className = 'receipt';
     el.innerHTML = `<div class="head">${escapeHtml(r.head)}</div>` +
       r.lines.map(([k,v]) => `<div class="line"><span class="k">${escapeHtml(k)}</span><span>${escapeHtml(v)}</span></div>`).join('') +
-      `<div style="margin-top:10px; font-style:italic; color:var(--ink); line-height:1.5;">${escapeHtml(r.intended)}</div>` +
-      (r.unintended !== '—' ? `<div class="unintended">unintended: ${escapeHtml(r.unintended)}</div>` : '');
-    body.appendChild(el);
+      `<div class="receipt-intended">${escapeHtml(r.intended)}</div>` +
+      (r.unintended !== '—' ? `<div class="unintended">unintended — ${escapeHtml(r.unintended)}</div>` : '');
+    recSec.appendChild(el);
   });
-  if (dueReceipts.length === 0) {
-    const el = document.createElement('div');
-    el.style.cssText = 'text-align:center; color:var(--ink-faint); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase; margin-bottom:20px;';
-    el.textContent = 'No receipts tonight';
-    body.appendChild(el);
-  }
 
-  // 2) memory prune (only if mem getting tight, force a prune)
+  // ---- C) MEMORY — the prune (the cost of watching) ----
   const mustPrune = STATE.mem < 950 - (STATE.day - 1) * 60;
   if (mustPrune || STATE.day >= 3) {
-    const prompt = document.createElement('div');
-    prompt.className = 'prune-prompt';
-    prompt.innerHTML = 'Memory is the only economy. Keep one. Prune one. The pruned will not appear in your ending.';
-    body.appendChild(prompt);
-
     const candidates = buildPruneCandidates();
+    const memSec = section('Memory', 'keep what matters');
     if (candidates.length === 0) {
-      const el = document.createElement('div');
-      el.style.cssText = 'text-align:center; color:var(--ink-dim); font-family:var(--font-mono); font-size:10px; letter-spacing:.15em; text-transform:uppercase; padding:14px;';
-      el.textContent = 'No moments to keep tonight';
-      body.appendChild(el);
+      const e = document.createElement('div'); e.className = 'vigil-empty'; e.textContent = 'Nothing left worth keeping tonight.';
+      memSec.appendChild(e);
       $('vigilNextBtn').disabled = false;
     } else {
+      const prompt = document.createElement('div');
+      prompt.className = 'prune-prompt';
+      prompt.innerHTML = `You cannot hold it all. <b>Keep</b> what you want in your ending — <b>prune</b> the rest to free memory. The pruned are gone for good.`;
+      memSec.appendChild(prompt);
+
       const tally = document.createElement('div');
       tally.className = 'prune-tally';
-      tally.innerHTML = `<span class="keep-c">Kept: <span id="keepCount">0</span></span><span class="prune-c">Pruned: <span id="pruneCount">0</span></span><span class="pending-c">Pending: <span id="pendingCount">${candidates.length}</span></span>`;
-      body.appendChild(tally);
-
-      const note = document.createElement('div');
-      note.style.cssText = 'font-family:var(--font-mono); font-size:9px; color:var(--ink-dim); text-align:center; letter-spacing:.15em; text-transform:uppercase; margin-bottom:14px;';
-      note.innerHTML = 'Choose for each. Pruned moments are gone for good.<br><span style="color:var(--ink-faint);">+12 MEM per prune · 0 for keep</span>';
-      body.appendChild(note);
+      tally.innerHTML = `<span class="keep-c">kept <span id="keepCount">0</span></span><span class="prune-c">pruned <span id="pruneCount">0</span></span><span class="pending-c">left <span id="pendingCount">${candidates.length}</span></span>`;
+      memSec.appendChild(tally);
 
       candidates.forEach(c => {
         const el = document.createElement('div');
         el.className = 'memory';
         el.dataset.id = c.id;
+        const col = CITIZENS[c.who_key] ? CITIZENS[c.who_key].color : 'var(--amber)';
         el.innerHTML = `
-          <div class="what">${escapeHtml(c.what)}</div>
-          <div class="meta"><span class="who">${escapeHtml(c.who)}</span> · ${escapeHtml(c.meta)}</div>
-          <div class="row">
-            <button class="pill keep" data-action="keep">Keep</button>
-            <button class="pill prune" data-action="prune">Prune · +12 MEM</button>
-          </div>
-        `;
-        const keepBtn  = el.querySelector('[data-action="keep"]');
-        const pruneBtn = el.querySelector('[data-action="prune"]');
-        keepBtn.onclick  = () => { markKeep(el, c, candidates);  updateTally(candidates); };
-        pruneBtn.onclick = () => { markPrune(el, c, candidates); updateTally(candidates); };
-        body.appendChild(el);
+          <div class="mem-accent" style="background:${col}"></div>
+          <div class="mem-body">
+            <div class="what">“${escapeHtml(c.what)}”</div>
+            <div class="meta"><span class="who" style="color:${col}">${escapeHtml(c.who)}</span> · ${escapeHtml(c.meta)}</div>
+            <div class="row">
+              <button class="pill keep" data-action="keep">✦ Keep</button>
+              <button class="pill prune" data-action="prune">Prune · +12 MEM</button>
+            </div>
+          </div>`;
+        el.querySelector('[data-action="keep"]').onclick  = () => { markKeep(el, c, candidates);  updateTally(candidates); };
+        el.querySelector('[data-action="prune"]').onclick = () => { markPrune(el, c, candidates); updateTally(candidates); };
+        memSec.appendChild(el);
       });
     }
   } else {

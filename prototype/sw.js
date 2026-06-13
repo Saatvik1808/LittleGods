@@ -1,4 +1,4 @@
-const CACHE = "little-gods-v7";
+const CACHE = "little-gods-v8";
 const FILES = [
   "./",
   "./index.html",
